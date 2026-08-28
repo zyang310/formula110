@@ -1,19 +1,19 @@
-Date and time:
-Participants and contributions:
+**Date and time:** 
+**Participants and contributions:** 
 
-Question or objective:
+**Question or objective:** 
 
-What we investigated or changed:
+**What we investigated or changed:** 
 
-Evidence:
-- Sources or documentation:
-- AI-agent assistance:
-- Commits or code:
-- Experiment output:
-- Leaderboard result, if applicable:
+**Evidence:**
+- **Sources or documentation:** 
+- **AI-agent assistance:** 
+- **Commits or code:** 
+- **Experiment output:** 
+- **Leaderboard result, if applicable:**
 
-What we observed:
+**What we observed:**
 
-Decision and rationale:
+**Decision and rationale:**
 
-Next steps:
+**Next steps:**
