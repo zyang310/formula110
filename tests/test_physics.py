@@ -104,6 +104,32 @@ def test_resolve_vehicle_command_brakes_before_reverse() -> None:
     assert command.next_pending_drive_direction == -1
 
 
+def test_pending_direction_latch_blocks_positive_throttle_until_nearly_stopped() -> None:
+    command = resolve_vehicle_actuator_command(
+        command=RobotCommand(throttle=0.9),
+        current_speed_kmh=61.0,
+        config=FORMULA_VEHICLE_PHYSICS_CONFIG,
+        pending_drive_direction=-1,
+    )
+
+    assert command.engine_force == 0.0
+    assert command.brake_force > 0.0
+    assert command.next_pending_drive_direction == 1
+
+
+def test_zero_throttle_clears_the_pending_direction_latch() -> None:
+    command = resolve_vehicle_actuator_command(
+        command=RobotCommand(throttle=0.0),
+        current_speed_kmh=61.0,
+        config=FORMULA_VEHICLE_PHYSICS_CONFIG,
+        pending_drive_direction=-1,
+    )
+
+    assert command.engine_force == 0.0
+    assert command.brake_force == 0.0
+    assert command.next_pending_drive_direction == 0
+
+
 def test_vehicle_spawn_height_requires_positive_wheel_radius() -> None:
     with pytest.raises(ValueError, match="wheel_radius"):
         vehicle_spawn_height(VehiclePhysicsConfig(wheel_radius=0.0))
