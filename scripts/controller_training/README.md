@@ -37,6 +37,8 @@ Run every command from the repository root.
 | `faster-line-v21` | 2 parameters; retests the straight-speed ceiling under v19's slower corner approach | equal-weight first+best `lap_time_score_v7` with GA | **Discarded** at generation 19; it moved, but exposed the v7 ranking defect and its branch regresses best lap |
 | `faster-line-v22` | 4 parameters; the whole speed profile, jointly | best-lap-first `lap_time_score_v8` with GA | **Closed** at generation 11; every generation kept the seeded v19 values |
 | `faster-line-v23` | 2 line-timing parameters that finished exactly on a bound | best-lap-first `lap_time_score_v8` with GA | **Closed** at generation 14; broke the 457-tick floor on one seed, but not on any worst-case key, so not promoted |
+| `faster-line-v24` | 8 global speed-cap and startup brake-turn drift parameters | best-lap-first `lap_time_score_v8` with GA | **Closed** after 10 flat generations; every winner left the new drift disabled |
+| `faster-line-v25` | 9 local-corridor speed-bonus and reusable drift parameters | bounded-incident `lap_time_score_v9` with GA | **Closed and promoted** at generation 10; 30/30 search trials clean, with 456-tick official best laps |
 
 ## Train
 
@@ -924,6 +926,64 @@ does not justify re-running the promotion gates, so `race_faster` still carries
 v19 generation 6. The checkpoint is retained if the direction is picked up again -
 note that `line_target_release_per_tick` barely moved (0.2500 to 0.2495), so
 sensitivity is the live half of the pair and deserves a run of its own.
+
+### V24 - startup brake-turn drift and the global speed ceiling
+
+V24 tested the seed-110 first-turn idea directly: while the car is still in its
+startup window, sufficient steering and a close front return can trigger one
+short negative-throttle pulse. The requested steering is held through the pulse,
+then the existing neutral latch-release tick restores drive. The new behavior is
+default-off, so a seeded incumbent remains exactly reproducible.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v24-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v24 \
+  --optimizer ga --objective lap-time-v8 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v19-ga/generations/generation-006.json \
+  --artifact-root artifacts/controller-search/faster-line-v24-ga \
+  --population 48 --elites 10 --generations 10 \
+  --optimizer-seed 590137 --workers 5 --evaluator-recycle-trials 120
+```
+
+The standalone pulse was promising on seed 110, moving the first lap from 509
+to 501 ticks, but the joint global-speed/drift search could not improve the
+30-seed robust score. All ten generations stayed flat and selected the disabled
+anchor, so the run was closed under the plateau rule. A global 30 m/s target was
+also unsafe in direct probes. `speed_cap_mps` is only sensor normalization; it
+does not constrain vehicle speed, so raising it cannot make the car faster.
+
+### V25 - local long-corridor boost and reusable drift
+
+V25 replaced the global target with a bounded, geometry-triggered boost. A
+pose-invariant near/far-curvature check recognizes a sustained straight, adds a
+local target-speed bonus for a short window, then arms the same brake-turn pulse
+for the next hard corner. This carries more speed down a long corridor without
+leaving the higher target active around the whole lap.
+
+It also introduces `lap_time_score_v9`. V9 keeps survival, a completed lap, and
+three timed laps as hard requirements, but expands the search incident budget
+from 0.25 to 0.50 damage and from 1.5 to 2.0 contact seconds. Within that bounded
+budget it ranks best-lap distribution first, then first lap and their sum. This
+lets a genuinely faster low-contact line compete during mutation; clean trials
+still win later tie-breaks, and promotion retains the stricter clean gates.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v25-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v25 \
+  --optimizer ga --objective lap-time-v9 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v19-ga/generations/generation-006.json \
+  --artifact-root artifacts/controller-search/faster-line-v25-ga \
+  --population 48 --elites 10 --generations 10 \
+  --optimizer-seed 590138 --workers 5 --evaluator-recycle-trials 120
+```
+
+Generation 10 won with a 0.555 m/s corridor target bonus held for 0.236 s and a
+0.412 negative-throttle pulse held for about five ticks. It was nevertheless
+fully clean on all 30 search trials. Against v19, mean best lap improved from
+457.000 to 455.633 ticks, mean first lap from 507.10 to 505.57 ticks, and mean
+distance from 700.465 to 702.384 m. The official seeds both reached 456-tick
+(7.600 s) best laps; the 100-seed soak remained 100/100 clean and measured a
+27.215 m/s peak. This generation is baked into `controllers.race_faster`.
 
 ### Finding the next revision
 

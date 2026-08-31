@@ -68,6 +68,8 @@ SearchPreset = Literal[
     "faster-line-v21",
     "faster-line-v22",
     "faster-line-v23",
+    "faster-line-v24",
+    "faster-line-v25",
 ]
 OptimizerKind = Literal["cem", "ga"]
 ObjectiveKind = Literal[
@@ -81,6 +83,7 @@ ObjectiveKind = Literal[
     "lap-time-v6",
     "lap-time-v7",
     "lap-time-v8",
+    "lap-time-v9",
 ]
 Score = tuple[float, ...]
 
@@ -88,6 +91,10 @@ Score = tuple[float, ...]
 # elimination threshold; the distance penalties keep a gradient inside the budget.
 INCIDENT_BUDGET_DAMAGE = 0.25
 INCIDENT_BUDGET_CONTACT_S = 1.50
+# V25 intentionally allows a brushed wall to compete when it buys real lap
+# time, while still rejecting heavy damage or prolonged barrier riding.
+RELAXED_INCIDENT_BUDGET_DAMAGE = 0.50
+RELAXED_INCIDENT_BUDGET_CONTACT_S = 2.00
 DAMAGE_DISTANCE_PENALTY_M = 120.0
 CONTACT_DISTANCE_PENALTY_M = 6.0
 
@@ -332,6 +339,35 @@ FASTER_LINE_V22_BASE_PARAMETERS = FASTER_LINE_V21_BASE_PARAMETERS
 # two of its genes sit exactly on a bound - `line_turn_sensitivity` on the
 # 0.002 floor and `line_target_release_per_tick` on the 0.25 ceiling.
 FASTER_LINE_V23_BASE_PARAMETERS = FASTER_LINE_V22_BASE_PARAMETERS
+
+# The user identified the opening hairpin as a different control regime: a
+# short reverse-throttle rotation impulse, followed by neutral and a brief
+# straightening phase, can trade a little longitudinal speed for much earlier
+# yaw without the six-tick emergency AVOID brake seen in the seed-110 trace.
+# V24 adds that default-off structural lever and jointly reopens the two *real*
+# pace limits: the launch target and straight target.  `speed_cap_mps` is only
+# feature normalization and is deliberately not searched.
+FASTER_LINE_V24_BASE_PARAMETERS = replace(
+    FASTER_LINE_V23_BASE_PARAMETERS,
+    startup_drift_window_seconds=3.25,
+    startup_drift_trigger_front_m=8.5,
+    startup_drift_minimum_speed_mps=14.0,
+    startup_drift_minimum_steer=0.30,
+    startup_drift_pulse_seconds=0.08,
+    startup_drift_steer_gain=1.35,
+)
+
+# V24 mixed a proven seed-110 opening pulse with two already-exhausted global
+# speed genes and stayed flat for ten generations under a perfectly-clean gate.
+# V25 raises speed only after a sustained pose-invariant straight, targeting the
+# long final corridor, and evaluates it with the bounded-damage v9 objective.
+FASTER_LINE_V25_BASE_PARAMETERS = replace(
+    FASTER_LINE_V24_BASE_PARAMETERS,
+    long_straight_minimum_duration_s=0.35,
+    long_straight_maximum_local_curvature=0.012,
+    long_straight_speed_bonus_seconds=0.60,
+    long_straight_target_speed_bonus_mps=0.0,
+)
 
 
 class Optimizer(Protocol):
@@ -980,6 +1016,59 @@ def faster_line_v23_parameter_space(
     )
 
 
+def faster_line_v24_parameter_space(
+    base: ControllerParameters = FASTER_LINE_V24_BASE_PARAMETERS,
+) -> ParameterSpace:
+    """Jointly search a one-shot opening drift and higher real speed targets."""
+    return ParameterSpace(
+        (
+            _spec("straight_target_speed_mps", 25.0, 34.0, base.straight_target_speed_mps, 1.20, 0.060),
+            _spec("startup_speed_cap_mps", 22.5, 27.5, base.startup_speed_cap_mps, 0.70, 0.035),
+            _spec("startup_drift_brake", 0.0, 0.90, base.startup_drift_brake, 0.20, 0.010),
+            _spec("startup_drift_trigger_front_m", 6.5, 10.5, base.startup_drift_trigger_front_m, 0.65, 0.030),
+            _spec("startup_drift_minimum_steer", 0.15, 0.65, base.startup_drift_minimum_steer, 0.10, 0.005),
+            _spec("startup_drift_pulse_seconds", 1.0 / 60.0, 0.20, base.startup_drift_pulse_seconds, 0.035, 0.003),
+            _spec("startup_drift_steer_gain", 1.0, 2.50, base.startup_drift_steer_gain, 0.28, 0.014),
+            _spec("startup_drift_straighten_seconds", 0.0, 0.35, base.startup_drift_straighten_seconds, 0.08, 0.004),
+        )
+    )
+
+
+def faster_line_v25_parameter_space(
+    base: ControllerParameters = FASTER_LINE_V25_BASE_PARAMETERS,
+) -> ParameterSpace:
+    """Search the long-corridor boost and the independently proven opening drift."""
+    return ParameterSpace(
+        (
+            _spec("long_straight_minimum_duration_s", 0.10, 0.80, base.long_straight_minimum_duration_s, 0.14, 0.007),
+            _spec(
+                "long_straight_maximum_local_curvature",
+                0.003,
+                0.035,
+                base.long_straight_maximum_local_curvature,
+                0.006,
+                0.0003,
+            ),
+            _spec(
+                "long_straight_speed_bonus_seconds",
+                0.20,
+                1.00,
+                base.long_straight_speed_bonus_seconds,
+                0.16,
+                0.008,
+            ),
+            _spec(
+                "long_straight_target_speed_bonus_mps", 0.0, 6.0, base.long_straight_target_speed_bonus_mps, 1.20, 0.060
+            ),
+            _spec("startup_drift_brake", 0.0, 0.80, base.startup_drift_brake, 0.18, 0.009),
+            _spec("startup_drift_trigger_front_m", 6.5, 10.5, base.startup_drift_trigger_front_m, 0.65, 0.030),
+            _spec("startup_drift_minimum_steer", 0.15, 0.65, base.startup_drift_minimum_steer, 0.10, 0.005),
+            _spec("startup_drift_pulse_seconds", 1.0 / 60.0, 0.18, base.startup_drift_pulse_seconds, 0.035, 0.003),
+            _spec("startup_drift_steer_gain", 1.0, 2.20, base.startup_drift_steer_gain, 0.24, 0.012),
+        )
+    )
+
+
 def _release_initial(base: ControllerParameters) -> float:
     """Start the release rate at the outward slew, i.e. v3's symmetric behaviour."""
     release = base.line_target_release_per_tick
@@ -1112,6 +1201,8 @@ def _full_evaluation_seeds(preset: SearchPreset, manifest: SeedManifest) -> tupl
         "faster-line-v21",
         "faster-line-v22",
         "faster-line-v23",
+        "faster-line-v24",
+        "faster-line-v25",
     ):
         return manifest.training + manifest.official
     return manifest.training
@@ -1139,6 +1230,8 @@ def _selection_evaluation_seeds(
         "faster-line-v21",
         "faster-line-v22",
         "faster-line-v23",
+        "faster-line-v24",
+        "faster-line-v25",
     ):
         return rotating + manifest.official
     return rotating
@@ -1656,6 +1749,68 @@ def lap_time_score_v8(
     )
 
 
+def lap_time_score_v9(
+    results: tuple[SoloTrialResult, ...],
+    baseline_distances: dict[int, float],
+) -> Score:
+    """Rank best and first laps before cleanliness within a looser incident cap."""
+    del baseline_distances
+    if not results:
+        raise ValueError("candidate evaluation requires at least one trial")
+    within_budget = sum(
+        1
+        for result in results
+        if result.damage <= RELAXED_INCIDENT_BUDGET_DAMAGE
+        and result.wall_contact_seconds <= RELAXED_INCIDENT_BUDGET_CONTACT_S
+    )
+    clean_count = sum(1 for result in results if result.damage == 0.0 and result.wall_contact_seconds == 0.0)
+    lap_ticks = tuple(
+        round(
+            (result.best_lap_time_seconds if result.best_lap_time_seconds is not None else result.elapsed_seconds * 2.0)
+            * 60.0
+        )
+        for result in results
+    )
+    first_lap_ticks = tuple(
+        round(
+            (
+                result.first_lap_time_seconds
+                if result.first_lap_time_seconds is not None
+                else result.elapsed_seconds * 2.0
+            )
+            * 60.0
+        )
+        for result in results
+    )
+    first_plus_best_ticks = tuple(first + best for first, best in zip(first_lap_ticks, lap_ticks, strict=True))
+    penalized_distances = tuple(
+        result.raw_distance_m
+        - DAMAGE_DISTANCE_PENALTY_M * result.damage
+        - CONTACT_DISTANCE_PENALTY_M * result.wall_contact_seconds
+        for result in results
+    )
+    return (
+        float(sum(1 for result in results if result.survived)),
+        float(sum(1 for result in results if result.lap_count >= 1)),
+        float(within_budget),
+        float(sum(1 for result in results if result.lap_count >= 3)),
+        -float(max(lap_ticks)),
+        -percentile(tuple(float(value) for value in lap_ticks), 0.90),
+        -median(lap_ticks),
+        -fmean(lap_ticks),
+        -float(max(first_lap_ticks)),
+        -percentile(tuple(float(value) for value in first_lap_ticks), 0.90),
+        -median(first_lap_ticks),
+        -fmean(first_lap_ticks),
+        -float(max(first_plus_best_ticks)),
+        -fmean(first_plus_best_ticks),
+        float(clean_count),
+        -fmean(result.damage for result in results),
+        -fmean(result.wall_contact_seconds for result in results),
+        fmean(penalized_distances),
+    )
+
+
 def percentile(values: tuple[float, ...], probability: float) -> float:
     """Return a linearly interpolated inclusive percentile."""
     if not values:
@@ -1865,6 +2020,25 @@ def _load_optimizer(
 
 
 def _checkpoint_context(preset: SearchPreset, parameters: ControllerParameters) -> dict[str, float]:
+    if preset == "faster-line-v25":
+        context = _checkpoint_context("faster-line-v24", parameters)
+        # The two v24 global speed genes and its rejected forced-straightening
+        # phase stay fixed; v25 searches only local corridor pace and drift.
+        context["straight_target_speed_mps"] = parameters.straight_target_speed_mps
+        context["startup_speed_cap_mps"] = parameters.startup_speed_cap_mps
+        context["startup_drift_straighten_seconds"] = parameters.startup_drift_straighten_seconds
+        return context
+    if preset == "faster-line-v24":
+        context = _checkpoint_context("faster-line-v23", parameters)
+        # V24 searches the actual speed targets plus every active drift scalar.
+        # Preserve v23's line timing and the fixed opening window/minimum speed.
+        context["line_turn_sensitivity"] = parameters.line_turn_sensitivity
+        context["line_target_release_per_tick"] = _release_initial(parameters)
+        context["startup_drift_window_seconds"] = parameters.startup_drift_window_seconds
+        context["startup_drift_minimum_speed_mps"] = parameters.startup_drift_minimum_speed_mps
+        del context["straight_target_speed_mps"]
+        del context["startup_speed_cap_mps"]
+        return context
     if preset == "faster-line-v23":
         # V21 and v22 each removed the genes they searched; v23 searches none of
         # them, so every one has to come back or the run silently reverts it to
@@ -2215,6 +2389,8 @@ def _candidate_score(
         return lap_time_score_v6(results, baseline_distances)
     if objective_kind == "lap-time-v8":
         return lap_time_score_v8(results, baseline_distances)
+    if objective_kind == "lap-time-v9":
+        return lap_time_score_v9(results, baseline_distances)
     if objective_kind == "lap-time-v7":
         return lap_time_score_v7(results, baseline_distances)
     return improved_score(results, baseline_distances)
@@ -2300,6 +2476,16 @@ def preset_configuration(
         if seed_checkpoint is not None:
             base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
         return base, faster_line_v17_parameter_space(base)
+    if preset == "faster-line-v25":
+        base = FASTER_LINE_V25_BASE_PARAMETERS
+        if seed_checkpoint is not None:
+            base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
+        return base, faster_line_v25_parameter_space(base)
+    if preset == "faster-line-v24":
+        base = FASTER_LINE_V24_BASE_PARAMETERS
+        if seed_checkpoint is not None:
+            base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
+        return base, faster_line_v24_parameter_space(base)
     if preset == "faster-line-v23":
         base = FASTER_LINE_V23_BASE_PARAMETERS
         if seed_checkpoint is not None:
@@ -2536,6 +2722,8 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "faster-line-v21",
             "faster-line-v22",
             "faster-line-v23",
+            "faster-line-v24",
+            "faster-line-v25",
         ),
     )
     parser.add_argument("--optimizer", choices=("cem", "ga"), default="cem")
@@ -2552,6 +2740,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "lap-time-v6",
             "lap-time-v7",
             "lap-time-v8",
+            "lap-time-v9",
         ),
         default="improved",
     )

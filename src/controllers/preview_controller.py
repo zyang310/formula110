@@ -100,6 +100,14 @@ class ControllerParameters:
     # Add speed in proportion to the pose-invariant corner-exit phase.  The
     # bonus is default-off and shares the existing non-stacking bonus envelope.
     corner_exit_target_speed_bonus_mps: float = 0.0
+    # Add pace only after the pose-invariant preview has remained nearly straight
+    # for long enough to identify a real corridor.  This raises the target on the
+    # long final stretch without raising every approach speed.  All values are
+    # default-off so existing presets are unchanged.
+    long_straight_minimum_duration_s: float = 0.0
+    long_straight_maximum_local_curvature: float = 0.0
+    long_straight_speed_bonus_seconds: float = 0.0
+    long_straight_target_speed_bonus_mps: float = 0.0
     line_clearance_m: float = 0.0
     wall_balance_gain: float = 0.38
     normal_steer_limit: float = 0.92
@@ -116,6 +124,21 @@ class ControllerParameters:
     # slowing later laps.  Either zero value disables the behavior.
     startup_speed_cap_mps: float = 0.0
     startup_speed_cap_seconds: float = 0.0
+    # Optional one-shot rotation pulse for the opening corner.  This is keyed to
+    # local wall/steering geometry rather than a seed or world pose: while the car
+    # is fast, committed to a turn, and closing on the front wall, briefly request
+    # reverse throttle to brake all four wheels while holding the turn.  The normal
+    # drive-latch release below inserts the required neutral tick afterward.  A
+    # short zero-steer phase can then arrest the rotation before power comes back.
+    # Zero brake or zero window/pulse duration disables the behavior exactly.
+    startup_drift_brake: float = 0.0
+    startup_drift_window_seconds: float = 0.0
+    startup_drift_trigger_front_m: float = 8.5
+    startup_drift_minimum_speed_mps: float = 14.0
+    startup_drift_minimum_steer: float = 0.30
+    startup_drift_pulse_seconds: float = 0.0
+    startup_drift_steer_gain: float = 1.0
+    startup_drift_straighten_seconds: float = 0.0
     steering_speed_reduction: float = 0.28
     yaw_speed_reduction: float = 0.22
     # Distance at which the throttle starts lifting, not braking; the name predates
@@ -202,6 +225,14 @@ class ControllerState:
     sweeper_preview_hold_direction: float = 0.0
     sweeper_preview_speed_hold_seconds: float = 0.0
     corner_exit_speed_bonus_factor: float = 0.0
+    long_straight_seconds: float = 0.0
+    long_straight_drift_armed: bool = False
+    long_straight_drift_direction: float = 0.0
+    long_straight_drift_seconds_remaining: float = 0.0
+    startup_drift_attempted: bool = False
+    startup_drift_direction: float = 0.0
+    startup_drift_seconds_remaining: float = 0.0
+    startup_drift_straighten_seconds_remaining: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +300,19 @@ class PreviewController:
                 avoiding=False,
                 startup_speed_cap_mps=startup_speed_cap_mps,
             )
+            desired_steer, throttle = self._startup_drift_command(
+                features,
+                racing_steer,
+                throttle,
+                startup_elapsed_s=startup_elapsed_s,
+                dt_s=sensors.dt_s,
+            )
+            desired_steer, throttle = self._post_long_straight_drift_command(
+                features,
+                desired_steer,
+                throttle,
+                dt_s=sensors.dt_s,
+            )
 
         steer_slew = (
             self.parameters.steer_slew_per_tick
@@ -314,6 +358,60 @@ class PreviewController:
             )
         return command
 
+    def _startup_drift_command(
+        self,
+        features: PreviewFeatures,
+        racing_steer: float,
+        throttle: float,
+        *,
+        startup_elapsed_s: float,
+        dt_s: float,
+    ) -> tuple[float, float]:
+        """Apply one short, geometry-triggered opening-corner rotation pulse."""
+        parameters = self.parameters
+        state = self.state
+        enabled = (
+            parameters.startup_drift_brake > 0.0
+            and parameters.startup_drift_window_seconds > 0.0
+            and parameters.startup_drift_pulse_seconds > 0.0
+        )
+        if not enabled:
+            return racing_steer, throttle
+
+        dt_s = _clamp(_finite_or(dt_s, 1.0 / 60.0), 0.0, 0.25)
+        if not state.startup_drift_attempted:
+            front_m = min(features.wall_front, features.lidar_front) * parameters.lidar_cap_m
+            should_start = (
+                startup_elapsed_s < parameters.startup_drift_window_seconds
+                and features.speed_mps >= parameters.startup_drift_minimum_speed_mps
+                and abs(racing_steer) >= parameters.startup_drift_minimum_steer
+                and front_m <= parameters.startup_drift_trigger_front_m
+            )
+            if should_start:
+                state.startup_drift_attempted = True
+                state.startup_drift_direction = 1.0 if racing_steer >= 0.0 else -1.0
+                state.startup_drift_seconds_remaining = parameters.startup_drift_pulse_seconds
+
+        if state.startup_drift_seconds_remaining > 0.0:
+            held_magnitude = max(abs(racing_steer), parameters.startup_drift_minimum_steer)
+            desired_steer = state.startup_drift_direction * _clamp(
+                held_magnitude * parameters.startup_drift_steer_gain,
+                0.0,
+                1.0,
+            )
+            state.startup_drift_seconds_remaining = max(0.0, state.startup_drift_seconds_remaining - dt_s)
+            if state.startup_drift_seconds_remaining <= 0.0:
+                state.startup_drift_straighten_seconds_remaining = parameters.startup_drift_straighten_seconds
+            return desired_steer, -_clamp(parameters.startup_drift_brake, 0.0, 1.0)
+
+        if state.startup_drift_straighten_seconds_remaining > 0.0:
+            state.startup_drift_straighten_seconds_remaining = max(
+                0.0,
+                state.startup_drift_straighten_seconds_remaining - dt_s,
+            )
+            return 0.0, throttle
+        return racing_steer, throttle
+
     def _release_drive_latch(self, throttle: float, speed_mps: float) -> float:
         """Clear the vehicle's pending-direction latch with one zero-throttle tick.
 
@@ -329,6 +427,48 @@ class PreviewController:
         ):
             return 0.0
         return throttle
+
+    def _post_long_straight_drift_command(
+        self,
+        features: PreviewFeatures,
+        racing_steer: float,
+        throttle: float,
+        *,
+        dt_s: float,
+    ) -> tuple[float, float]:
+        """Spend an armed corridor boost on a short rotation pulse next corner."""
+        parameters = self.parameters
+        state = self.state
+        enabled = parameters.startup_drift_brake > 0.0 and parameters.startup_drift_pulse_seconds > 0.0
+        if not enabled or state.startup_drift_seconds_remaining > 0.0:
+            return racing_steer, throttle
+
+        if state.long_straight_drift_seconds_remaining <= 0.0 and state.long_straight_drift_armed:
+            front_m = min(features.wall_front, features.lidar_front) * parameters.lidar_cap_m
+            should_start = (
+                features.speed_mps >= parameters.startup_drift_minimum_speed_mps
+                and abs(racing_steer) >= parameters.startup_drift_minimum_steer
+                and front_m <= parameters.startup_drift_trigger_front_m
+            )
+            if should_start:
+                state.long_straight_drift_armed = False
+                state.long_straight_drift_direction = 1.0 if racing_steer >= 0.0 else -1.0
+                state.long_straight_drift_seconds_remaining = parameters.startup_drift_pulse_seconds
+
+        if state.long_straight_drift_seconds_remaining <= 0.0:
+            return racing_steer, throttle
+        held_magnitude = max(abs(racing_steer), parameters.startup_drift_minimum_steer)
+        desired_steer = state.long_straight_drift_direction * _clamp(
+            held_magnitude * parameters.startup_drift_steer_gain,
+            0.0,
+            1.0,
+        )
+        step_seconds = _clamp(_finite_or(dt_s, 1.0 / 60.0), 0.0, 0.25)
+        state.long_straight_drift_seconds_remaining = max(
+            0.0,
+            state.long_straight_drift_seconds_remaining - step_seconds,
+        )
+        return desired_steer, -_clamp(parameters.startup_drift_brake, 0.0, 1.0)
 
     def _update_stall_state(self, sensors: RobotSensors, features: PreviewFeatures) -> None:
         distance_m = max(0.0, _finite_or(sensors.odometry.distance_m))
@@ -472,6 +612,7 @@ class PreviewController:
         self._update_sweeper_speed_state(shape, dt_s)
         self._update_sweeper_preview_speed_state(shape, dt_s)
         self._update_corner_exit_speed_state(shape)
+        self._update_long_straight_speed_state(shape, dt_s)
         previous_target = self.state.line_target
         if parameters.initialize_line_target_from_preview and not self.state.line_target_initialized:
             target = raw_target
@@ -584,6 +725,27 @@ class PreviewController:
             return
         phase_difference = (abs(far_turn) - abs(near_turn)) / dominant
         self.state.corner_exit_speed_bonus_factor = _unit_interval(-phase_difference / LINE_PHASE_TRANSITION_RATIO)
+
+    def _update_long_straight_speed_state(
+        self,
+        shape: tuple[float, float],
+        dt_s: float,
+    ) -> None:
+        """Measure a sustained locally straight corridor without world coordinates."""
+        parameters = self.parameters
+        if (
+            parameters.long_straight_minimum_duration_s <= 0.0
+            or parameters.long_straight_maximum_local_curvature <= 0.0
+            or parameters.long_straight_speed_bonus_seconds <= 0.0
+            or parameters.long_straight_target_speed_bonus_mps <= 0.0
+        ):
+            self.state.long_straight_seconds = 0.0
+            return
+        if max(abs(shape[0]), abs(shape[1])) <= parameters.long_straight_maximum_local_curvature:
+            step_seconds = _clamp(_finite_or(dt_s, 1.0 / 60.0), 0.0, 0.25)
+            self.state.long_straight_seconds += step_seconds
+        else:
+            self.state.long_straight_seconds = 0.0
 
     def _line_target_rate(self, previous_target: float, raw_target: float) -> float:
         """Pick the outward or the release rate for this tick's target move."""
@@ -717,6 +879,16 @@ class PreviewController:
             speed_bonus = max(speed_bonus, parameters.sweeper_target_speed_bonus_mps)
         if self.state.sweeper_preview_speed_hold_seconds > 0.0:
             speed_bonus = max(speed_bonus, parameters.sweeper_preview_target_speed_bonus_mps)
+        if (
+            parameters.long_straight_target_speed_bonus_mps > 0.0
+            and parameters.long_straight_minimum_duration_s > 0.0
+            and parameters.long_straight_minimum_duration_s
+            <= self.state.long_straight_seconds
+            < parameters.long_straight_minimum_duration_s + parameters.long_straight_speed_bonus_seconds
+        ):
+            speed_bonus = max(speed_bonus, parameters.long_straight_target_speed_bonus_mps)
+            if startup_speed_cap_mps is None:
+                self.state.long_straight_drift_armed = True
         speed_bonus = max(
             speed_bonus,
             parameters.corner_exit_target_speed_bonus_mps * self.state.corner_exit_speed_bonus_factor,

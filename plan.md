@@ -1,34 +1,31 @@
 # Competitive Formula 110 Controller - Living Plan
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 ## Status
 
-- Project state: **stopped at the user's request after v23.** v19 generation 6 is
-  the promoted, baked, fully gated controller. Ten versions ran under the
-  ten-generation plateau rule. Two produced promotions - v16 (launch floor) and
-  v19 (corner floor and front-stop ceiling) - and both came from reopening a
-  bound the previous run's elites had pinned exactly. Six returned nothing
-  promotable: v17 (joint re-rank), v18 (new corner-exit lever, every generation
-  chose the default-off value), v20 (launch box), v21 (discarded with the ranking
-  defect it exposed), v22 (whole speed profile under the corrected ranking), and
-  v23 (broke the best-lap floor on one seed, but not on any worst-case key).
+- Project state: **v25 generation 10 is promoted and baked.** V24 closed after
+  ten flat generations, then v25 coupled a short long-corridor speed bonus to a
+  reusable brake-turn drift and improved both first and best laps. The selected
+  vector stayed fully clean despite being searched under a looser bounded-damage
+  ranking.
 - Current submission baseline: `controllers.crash_fast` (stationary).
 - Current best safe controller: `controllers.minimum_viable` (coasting; re-gated
   clean on all 14 official and validation seeds).
-- Current best promoted fast vector: generation-6 `faster-line-v19` GA. Robust
-  worst best lap **457 ticks (7.617 s)** across all 30 search seeds, 698.05 m
-  official mean, 100/100 clean soak, 19/20 head-to-head, zero damage and zero
-  wall contact across all 114 gate trials.
-- Current baked candidate: `controllers.race_faster` exactly carries v19
-  generation 6.
-- Ranking: `lap_time_score_v8` supersedes v7. V7 ranked the first+best sum ahead
-  of its parts, so a tied sum fell through to first lap and let the search trade
-  best-lap ticks away one for one (D-053). V8 leads with best lap.
-- If resumed: line timing is the only direction still showing movement. v23
-  reached `line_turn_sensitivity` 0.00055, below its old floor, and broke the
-  457-tick uniformity on one seed. Speed profile, launch, and line magnitude are
-  each measured as exhausted (C-054, C-050, D-055).
+- Current best promoted fast vector: generation-10 `faster-line-v25` GA. Search
+  was 30/30 clean at 455.633 mean best-lap ticks and 505.567 mean first-lap
+  ticks. Official best lap is **456 ticks (7.600 s)** on both seeds; validation
+  is 12/12 clean, soak is 100/100 clean, and head-to-head is 19/20.
+- Current baked candidate: `controllers.race_faster` exactly carries v25
+  generation 10.
+- Ranking: `lap_time_score_v9` admits up to 0.50 damage and 2.0 contact seconds
+  into the search's competitive tier, then leads with the best-lap distribution,
+  first lap, and their sum. Promotion still demands clean solo gates; the v25
+  winner recorded zero damage and zero wall contact in every solo gate trial.
+- Next revision: keep the global speed target unchanged. If optimization resumes,
+  tune the local corridor detector/boost timing or use trace-defined segment
+  timing; the global 30 m/s probe was unsafe and `speed_cap_mps` is normalization,
+  not a physical limiter.
 
 Status markers: `[ ]` pending, `[~]` active, `[x]` complete, `[!]` blocked or
 rejected.
@@ -514,6 +511,10 @@ Append one row after every meaningful run. Keep failed experiments.
 | C-054 | 2026-08-30 | `faster-line-v22` four-gene GA under `lap-time-v8`, seeded from v19 generation 6 | `artifacts/controller-search/faster-line-v22-ga/generations/generation-001.json`, stopped with 11 archives | Training 28 + official 2 | Searched the whole speed profile jointly - straight target, corner target, and both ends of the front brake ramp - with every bound v19 and v21 reopened, ranked best lap first. **All eleven generations kept the seeded v19 values unchanged** at `[30,30,30,30,30,-457,-513,-970,...,-457,-507.1,-964.1,700.4649330821997]`, with mean best-lap exactly 457.0. Under a ranking that cannot trade best lap away, no combination of the four pace genes beats v19. | Stop at the ten-generation plateau; treat 457 ticks as a floor of the speed policy, not of the search | Attack the line's timing, the one dimension untouched by v18-v22 |
 | D-055 | 2026-08-30 | line entry-ratio reachability, measured against the real `_line_target` | direct calls to `PreviewController._line_target` with the baked v19 vector | n/a | D-051 rejected the whole line family as physically saturated. That is right for the clamp but wrong for the entry coefficient, so the claim was measured rather than reasoned. Sweeping `racing_line_entry_offset_ratio` at 0.95, 1.20, and 1.60 across four phase blends: full entry and a 50% blend are already clipped at 0.95 and do not move at all; the weaker 25% blend moves from 0.795 to 0.950 at ratio 1.20 and then stops. The coefficient is therefore live, but only up to about 1.20 and only in a narrow band, and it reaches the same clamp sooner rather than extending the range. Magnitude really is capped; timing is not. | Keep the magnitude rejection, on measured rather than assumed grounds; do not spend a run on the entry ratio | Search `line_turn_sensitivity` and `line_target_release_per_tick`, both of which finished exactly on a bound |
 | C-056 | 2026-08-30 | `faster-line-v23` two-gene GA under `lap-time-v8`, seeded from v19 generation 6 | `artifacts/controller-search/faster-line-v23-ga/generations/generation-004.json`, stopped with 14 archives | Training 28 + official 2 | Reopened the two pinned line-timing genes. Generation 4 moved `line_turn_sensitivity` to 0.00055, **below the old 0.002 floor**, confirming that floor was binding, and broke the 457-tick uniformity for the first time: mean best-lap fell 457.000 to 456.933, i.e. one of the thirty seeds reached 456 ticks (7.600 s). But the worst case did not move on any key - best lap 457, first lap 513, and first+best 970 all unchanged - and mean distance fell 700.465 to 700.30 m. `line_target_release_per_tick` barely moved (0.2500 to 0.2495), so the release ceiling is not the live half of the pair. Generations 5-14 were exactly flat. | Stop at the ten-generation plateau. **Do not promote**: the gain is one tick on one of thirty seeds, sits below every worst-case key in the ranking, and comes with a distance regression, so it does not justify re-running the promotion gates. Retain v19 generation 6 as baked | Line timing is the live direction if this is resumed; search `line_turn_sensitivity` alone, with a wider floor and a population large enough to resolve a sub-tick mean |
+| C-057 | 2026-08-31 | `faster-line-v24` eight-gene global-speed and startup-drift GA under `lap-time-v8`, seeded from v19 generation 6 | `artifacts/controller-search/faster-line-v24-ga/generations/generation-010.json` | Training 28 + official 2 | Added a default-off startup brake-turn pulse, plus the global straight target. A direct seed-110 pulse improved first lap from 509 to 501 ticks and removed six AVOID ticks, but all ten GA generations kept the seeded drift-off incumbent and its score exactly unchanged. A 30 m/s global target was unsafe. `speed_cap_mps` was confirmed to be sensor normalization rather than an actuator limit. | Close after ten flat generations and reject the global-cap coupling | Isolate the long corridor with a geometry-triggered, time-bounded bonus and reuse the drift only at its following corner |
+| D-058 | 2026-08-31 | bounded-incident `lap_time_score_v9` and corridor/drift diagnostics | direct seed-110 probes and regression tests | Seed 110, then synthetic score cases | V9 expands the competitive search budget from 0.25 to 0.50 damage and 1.5 to 2.0 contact seconds, while preserving survival, lap completion, and three timed laps as hard tiers and ranking best-lap distribution first. The corridor detector uses pose-invariant near/far curvature, times only sustained straight travel, applies a bounded local target bonus, and arms one brake-turn pulse for the next hard corner. Unbounded or global boosts carried unsafe speed around the full lap; the bounded detector did not. | Accept bounded incidents only for mutation ranking; retain clean solo promotion gates | Search the coupled local bonus and reusable drift in v25 |
+| C-059 | 2026-08-31 | `faster-line-v25` nine-gene corridor-speed and reusable-drift GA under `lap-time-v9`, seeded from v19 generation 6 | `artifacts/controller-search/faster-line-v25-ga/generations/generation-010.json` | Training 28 + official 2 | Generation 10 won after improvements in generations 2, 3, 6, 8, 9, and 10. All 30 trials survived, completed three timed laps, stayed within budget, and were also completely clean. Mean best lap improved 457.000 to **455.633** ticks, mean first lap 507.10 to **505.57**, worst first lap 513 to **512**, and mean distance 700.465 to **702.384 m**. The vector adds 0.555 m/s for 0.236 s after 0.273 s of straight travel, then uses a 0.412 brake pulse for about five ticks at the following turn. | Stop at the generation cap and retain generation 10 | Bake and run every promotion gate |
+| P-060 | 2026-08-31 | baked v25 generation 10 promotion audit | `artifacts/controller-search/faster-line-v25-gate/{official,validation,soak}.json` | Official 2, validation 12, soak 100, and 20 role-swapped races | Official 2/2 clean at 701.71 m mean; both best laps were **456 ticks (7.600 s)** and worst first lap improved 513 to 512 ticks. Validation was 12/12 clean with 703.73 m mean, 696.22 m worst, 455.92 mean best-lap ticks, and 512 worst first-lap ticks. Soak was 100/100 clean with 702.64 m mean, 696.52 m worst, 455.84 mean best-lap ticks, 458 worst best lap, 514 worst first lap, and 27.215 m/s peak. Head-to-head passed at 19 wins and 1 loss. | Promote v25 generation 10 as the baked fast controller, superseding v19 generation 6 | Preserve the local rather than global cap; use segment timing for any next revision |
 
 ## Decision log
 
@@ -577,6 +578,9 @@ Append one row after every meaningful run. Keep failed experiments.
 | 2026-08-30 | Treat checkpoint context as part of a seeded candidate | A search checkpoint splits the candidate between `best_parameter_vector` (searched fields) and `checkpoint_context` (fixed fields needed to reproduce it). Loading only the vector silently paired later branches with whichever values happened to be baked in source, so their advertised parent was false. Seeding now validates and applies context first, then lets searched values override any redundant name. V13 starts under a fresh preset/root because v12 generation 1 was evaluated against the wrong fixed controller. |
 | 2026-08-30 | Speed up the long sweeper with a sustained-turn bonus, not a forced line | The user-identified segment really did have unused speed: the controller was coasting at roughly 24-25 m/s because local curvature lowered its target. Conventional outside-exit and line-hold variants were slower or unsafe because they affect every corner and add cross-track motion. A stateful, sensor-relative detector isolates the only turn direction sustained beyond 1.7 s and adds speed locally; its measured seed improves every robust three-lap statistic across all 30 search seeds without contact. The three new parameters default to zero, so existing controllers remain unchanged. |
 | 2026-08-30 | Close the solo v14 branch at generation 15 and promote generation 5 | Ten later generations were exactly flat despite GA stagnation inflation, while the winning activation, hold, and bonus values all remained inside their bounds. The final vector passes the 30-seed search suite, untouched validation, 100-seed soak, head-to-head, export, and code-quality gates. More generations or wider mutations in the same three-dimensional box have no evidence-backed expected gain; another version requires a new measured mechanism. |
+| 2026-08-31 | Use braking as a short turn-in impulse, not a normal speed-control mode | Reversing throttle enters the simulator's drive-direction latch, so sustained braking is still expensive. A roughly five-tick pulse holds steering long enough to rotate the car, and one exact neutral tick releases the latch before acceleration resumes. The selected policy triggers it only during startup geometry or at the first hard corner after a detected long corridor. |
+| 2026-08-31 | Raise speed locally in the long corridor rather than changing the normalization cap or global target | `speed_cap_mps` only scales sensor inputs, while a global 30 m/s target was unsafe. A pose-invariant straight-duration detector safely raises the actual target by 0.555 m/s for 0.236 s, then expires before the rest of the lap. The 100-seed clean soak reached 27.215 m/s peak. |
+| 2026-08-31 | Let bounded damage compete during v25 search but require clean promotion | A strict damage-first ordering can discard a materially faster low-contact line before mutation can refine it. V9 allows up to 0.50 damage and 2.0 contact seconds inside the competitive tier, then retains cleanliness as a tie-breaker. The policy is exploratory rather than a lowered release standard: the selected generation and all 114 solo promotion trials were fully clean. |
 
 ## Iteration rules
 

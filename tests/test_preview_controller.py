@@ -239,6 +239,143 @@ def test_startup_speed_cap_only_limits_the_configured_opening_seconds() -> None:
     assert late_command.throttle > 0.0
 
 
+def test_startup_drift_brakes_once_then_releases_latch_and_straightens() -> None:
+    controller = PreviewController(
+        ControllerParameters(
+            straight_target_speed_mps=25.0,
+            corner_target_speed_mps=25.0,
+            steering_speed_reduction=0.0,
+            throttle_gain=1.0,
+            steer_slew_per_tick=1.0,
+            startup_drift_brake=0.45,
+            startup_drift_window_seconds=3.0,
+            startup_drift_trigger_front_m=10.0,
+            startup_drift_minimum_speed_mps=14.0,
+            startup_drift_minimum_steer=0.20,
+            startup_drift_pulse_seconds=1.0 / 60.0,
+            startup_drift_steer_gain=1.5,
+            startup_drift_straighten_seconds=0.10,
+        )
+    )
+    sensors = RobotSensors(
+        dt_s=1.0 / 60.0,
+        tick=90,
+        odometry=OdometrySensors(speed_mps=15.0),
+        wall_lidar=lidar(*(9.0 for _ in range(7))),
+        lidar=lidar(*(9.0 for _ in range(7))),
+        camera=CameraSensors(
+            heading_error_degrees=25.0,
+            lookahead_offsets_m=(1.5, 3.0, 5.0),
+        ),
+    )
+
+    drift = controller(sensors)
+    release = controller(replace(sensors, tick=91))
+    drive = controller(replace(sensors, tick=92))
+
+    assert drift.throttle == -0.45
+    assert drift.steer > 0.20
+    assert controller.state.startup_drift_attempted
+    # A positive request immediately after reverse throttle must become one exact
+    # neutral tick so the simulator's pending-direction latch clears.
+    assert release.throttle == 0.0
+    assert drive.throttle > 0.0
+    assert release.steer == 0.0
+    assert drive.steer == 0.0
+
+
+def test_startup_drift_default_off_preserves_normal_nonnegative_throttle() -> None:
+    controller = PreviewController(ControllerParameters(straight_target_speed_mps=25.0))
+    sensors = RobotSensors(
+        dt_s=1.0 / 60.0,
+        tick=90,
+        odometry=OdometrySensors(speed_mps=15.0),
+        wall_lidar=lidar(*(8.0 for _ in range(7))),
+        lidar=lidar(*(8.0 for _ in range(7))),
+        camera=CameraSensors(heading_error_degrees=25.0, lookahead_offsets_m=(1.5, 3.0, 5.0)),
+    )
+
+    assert controller(sensors).throttle >= 0.0
+    assert not controller.state.startup_drift_attempted
+
+
+def test_long_straight_bonus_arms_after_sustained_local_straight_and_resets() -> None:
+    parameters = ControllerParameters(
+        straight_target_speed_mps=20.0,
+        corner_target_speed_mps=20.0,
+        steering_speed_reduction=0.0,
+        yaw_speed_reduction=0.0,
+        throttle_gain=1.0,
+        long_straight_minimum_duration_s=0.05,
+        long_straight_maximum_local_curvature=0.01,
+        long_straight_speed_bonus_seconds=0.10,
+        long_straight_target_speed_bonus_mps=4.0,
+    )
+    controller = PreviewController(parameters)
+    features = build_preview_features(RobotSensors(odometry=OdometrySensors(speed_mps=21.0)), parameters)
+
+    _, before_target = controller._speed_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        0.0,
+        0.0,
+        avoiding=False,
+        startup_speed_cap_mps=None,
+    )
+    for _ in range(3):
+        controller._update_long_straight_speed_state(  # pyright: ignore[reportPrivateUsage]
+            (0.002, -0.003), 1.0 / 60.0
+        )
+    throttle, boosted_target = controller._speed_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        0.0,
+        0.0,
+        avoiding=False,
+        startup_speed_cap_mps=None,
+    )
+
+    assert before_target == 20.0
+    assert boosted_target == 24.0
+    assert throttle > 0.0
+    assert controller.state.long_straight_drift_armed
+    controller._update_long_straight_speed_state(  # pyright: ignore[reportPrivateUsage]
+        (0.02, 0.0), 1.0 / 60.0
+    )
+    assert controller.state.long_straight_seconds == 0.0
+
+
+def test_corridor_boost_arms_drift_for_the_next_hard_corner() -> None:
+    parameters = ControllerParameters(
+        startup_drift_brake=0.45,
+        startup_drift_trigger_front_m=9.0,
+        startup_drift_minimum_speed_mps=14.0,
+        startup_drift_minimum_steer=0.20,
+        startup_drift_pulse_seconds=0.05,
+        startup_drift_steer_gain=1.5,
+    )
+    controller = PreviewController(parameters)
+    controller.state.long_straight_drift_armed = True
+    features = build_preview_features(
+        RobotSensors(
+            odometry=OdometrySensors(speed_mps=15.0),
+            wall_lidar=lidar(*(8.0 for _ in range(7))),
+            lidar=lidar(*(8.0 for _ in range(7))),
+        ),
+        parameters,
+    )
+
+    steer, throttle = controller._post_long_straight_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        -0.50,
+        1.0,
+        dt_s=1.0 / 60.0,
+    )
+
+    assert throttle == -0.45
+    assert steer == -0.75
+    assert not controller.state.long_straight_drift_armed
+    assert controller.state.long_straight_drift_seconds_remaining > 0.0
+
+
 def test_controller_still_brakes_during_avoidance() -> None:
     controller = PreviewController(ControllerParameters())
     sensors = RobotSensors(
@@ -1059,12 +1196,12 @@ def test_corner_exit_bonus_tracks_pose_invariant_exit_phase() -> None:
     )
     controller = PreviewController(parameters)
 
-    controller._update_corner_exit_speed_state((-0.12, -0.02))
+    controller._update_corner_exit_speed_state((-0.12, -0.02))  # pyright: ignore[reportPrivateUsage]
     features = build_preview_features(
         RobotSensors(odometry=OdometrySensors(speed_mps=10.5)),
         parameters,
     )
-    throttle, target_speed = controller._speed_command(
+    throttle, target_speed = controller._speed_command(  # pyright: ignore[reportPrivateUsage]
         features,
         curvature=0.0,
         steer=0.0,
@@ -1076,7 +1213,7 @@ def test_corner_exit_bonus_tracks_pose_invariant_exit_phase() -> None:
     assert target_speed == 12.0
     assert throttle > 0.0
 
-    controller._update_corner_exit_speed_state((-0.02, -0.12))
+    controller._update_corner_exit_speed_state((-0.02, -0.12))  # pyright: ignore[reportPrivateUsage]
 
     assert controller.state.corner_exit_speed_bonus_factor == 0.0
 

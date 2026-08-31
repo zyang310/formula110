@@ -112,6 +112,14 @@ class TraceCollector:
             "target_speed_mps": diagnostics.target_speed_mps,
             "sweeper_speed_hold_seconds": self.controller.state.sweeper_speed_hold_seconds,
             "sweeper_preview_speed_hold_seconds": self.controller.state.sweeper_preview_speed_hold_seconds,
+            "startup_drift_attempted": self.controller.state.startup_drift_attempted,
+            "startup_drift_seconds_remaining": self.controller.state.startup_drift_seconds_remaining,
+            "startup_drift_straighten_seconds_remaining": (
+                self.controller.state.startup_drift_straighten_seconds_remaining
+            ),
+            "long_straight_seconds": self.controller.state.long_straight_seconds,
+            "long_straight_drift_armed": self.controller.state.long_straight_drift_armed,
+            "long_straight_drift_seconds_remaining": self.controller.state.long_straight_drift_seconds_remaining,
             "curvature": diagnostics.curvature,
             "kappa_0": diagnostics.kappa[0],
             "kappa_1": diagnostics.kappa[1],

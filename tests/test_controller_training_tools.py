@@ -592,6 +592,39 @@ def test_lap_time_score_v8_refuses_to_trade_best_lap_for_first_lap() -> None:
     assert search.lap_time_score_v8((faster_first,), {}) > search.lap_time_score_v8((incumbent,), {})
 
 
+def test_lap_time_score_v9_allows_bounded_damage_but_rejects_excess() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    clean = _improved_trial(
+        evaluator,
+        raw_distance_m=700.0,
+        lap_count=3,
+        best_lap_time_seconds=457 / 60,
+        first_lap_time_seconds=513 / 60,
+    )
+    faster_with_brush = _improved_trial(
+        evaluator,
+        raw_distance_m=705.0,
+        damage=0.40,
+        wall_contact_seconds=1.80,
+        lap_count=3,
+        best_lap_time_seconds=456 / 60,
+        first_lap_time_seconds=512 / 60,
+    )
+    excessive = _improved_trial(
+        evaluator,
+        raw_distance_m=710.0,
+        damage=0.51,
+        lap_count=3,
+        best_lap_time_seconds=455 / 60,
+        first_lap_time_seconds=511 / 60,
+    )
+
+    assert search.lap_time_score_v8((clean,), {}) > search.lap_time_score_v8((faster_with_brush,), {})
+    assert search.lap_time_score_v9((faster_with_brush,), {}) > search.lap_time_score_v9((clean,), {})
+    assert search.lap_time_score_v9((clean,), {}) > search.lap_time_score_v9((excessive,), {})
+
+
 def test_faster_line_preset_is_isolated_and_uses_planned_bounds() -> None:
     search = load_tool("search")
 
@@ -1467,3 +1500,68 @@ def test_faster_line_v23_reopens_the_pinned_line_timing_bounds() -> None:
     assert args.preset == "faster-line-v23"
     assert args.objective == "lap-time-v8"
     assert bake.parse_args(["--preset", "faster-line-v23"]).preset == "faster-line-v23"
+
+
+def test_faster_line_v24_searches_opening_drift_and_real_speed_caps() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v24")
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == (
+        "straight_target_speed_mps",
+        "startup_speed_cap_mps",
+        "startup_drift_brake",
+        "startup_drift_trigger_front_m",
+        "startup_drift_minimum_steer",
+        "startup_drift_pulse_seconds",
+        "startup_drift_steer_gain",
+        "startup_drift_straighten_seconds",
+    )
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    assert bounds["straight_target_speed_mps"][1] > 30.0
+    assert bounds["startup_speed_cap_mps"][1] > 24.5
+    assert bounds["startup_drift_brake"][0] == 0.0
+    context = search._checkpoint_context("faster-line-v24", base)
+    assert not set(context) & set(space.names)
+    assert "line_turn_sensitivity" in context
+    assert "startup_drift_window_seconds" in context
+    assert search._full_evaluation_seeds("faster-line-v24", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v24", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v24", "--objective", "lap-time-v8"])
+    assert args.preset == "faster-line-v24"
+    assert args.objective == "lap-time-v8"
+    assert bake.parse_args(["--preset", "faster-line-v24"]).preset == "faster-line-v24"
+
+
+def test_faster_line_v25_searches_local_corridor_speed_under_relaxed_damage() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v25")
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == (
+        "long_straight_minimum_duration_s",
+        "long_straight_maximum_local_curvature",
+        "long_straight_speed_bonus_seconds",
+        "long_straight_target_speed_bonus_mps",
+        "startup_drift_brake",
+        "startup_drift_trigger_front_m",
+        "startup_drift_minimum_steer",
+        "startup_drift_pulse_seconds",
+        "startup_drift_steer_gain",
+    )
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    assert bounds["long_straight_target_speed_bonus_mps"] == (0.0, 6.0)
+    context = search._checkpoint_context("faster-line-v25", base)
+    assert not set(context) & set(space.names)
+    assert "straight_target_speed_mps" in context
+    assert "startup_speed_cap_mps" in context
+    assert search._full_evaluation_seeds("faster-line-v25", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v25", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v25", "--objective", "lap-time-v9"])
+    assert args.preset == "faster-line-v25"
+    assert args.objective == "lap-time-v9"
+    assert bake.parse_args(["--preset", "faster-line-v25"]).preset == "faster-line-v25"
