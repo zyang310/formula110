@@ -1,0 +1,13 @@
+{
+  // `artifacts/` is git-ignored search output: a long training run rewrites
+  // checkpoint.json and adds a generation file every ~60 s for hours. Watching
+  // and indexing it makes the editor react to a change continuously while a
+  // search is running, for files nothing in the editor needs to see.
+  "files.watcherExclude": {
+    "**/artifacts/**": true
+  },
+  "search.exclude": {
+    "**/artifacts/**": true
+  },
+  "files.exclude": {}
+}

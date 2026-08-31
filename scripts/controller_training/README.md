@@ -16,7 +16,27 @@ Run every command from the repository root.
 | `faster-line` | 15 speed, steering, and racing-line parameters | `improved_score` | **Closed** at generation 40; current 563 m incumbent |
 | `faster-line-v2-probe` | 19 pose-invariant line and speed parameters | `improved_score` with CEM | First gate rejected; rerun after the phase repair |
 | `faster-line-v2` | 17 parameters after fixing the two line-frame spring compensations | `improved_score` or `improved_score_v2` with GA | **Closed** at generation 40; current 595.98 m incumbent |
-| `faster-line-v3` | 16 parameters; unpins the five v2 bounds and adds the searchable line clamp | `improved_score` with GA | Ready, not yet run |
+| `faster-line-v3` | 16 parameters; unpins the five v2 bounds and adds the searchable line clamp | `improved_score` with GA | **Closed** at generation 60; current 621 m baked vector |
+| `faster-line-v4` | 17 parameters; raises v3's pinned ceilings and adds the asymmetric target release | `improved_score` with GA | **Closed** at generation 57; promoted 665.39 m vector |
+| `faster-line-v5` | 17 parameters; retains the safe line ceiling and reopens pace bounds | `improved_score` with GA | **Closed** at generation 100; 675.77 m baked candidate, not promotion-gated |
+| `faster-line-v6` | 20 parameters; fixes the line clamp, adds four steering-dynamics genes, and reopens v5's pressured non-geometric bounds | `improved_score` with GA | **Closed** at generation 10; exactly flat against v5 |
+| `faster-line-v7` | 16 focused speed and wall-policy parameters | robust `lap_time_score` with GA | **Closed** at generation 27; real winner 7.833 s worst / 7.817 s median |
+| `faster-line-v8` | 14 v7 refinements with moved wall/curvature bounds | quantized `lap_time_score_v2` with GA | **Closed** at generation 29; rejected crash-then-sprint optimum |
+| `faster-line-v9` | 14 safe wall/speed refinements | consistency-first `lap_time_score_v3` with GA | **Closed** at generation 30; generation 26 reached 7.783 s robust worst, but seed 110 still corrected on lap one |
+| `faster-line-v10` | 16 startup, corner, steering, and wall refinements | official-aware `lap_time_score_v4` with GA | **Closed** at generation 7; rejected a clean but 10.233 s slow-launch optimum |
+| `faster-line-v11` | v10's 16-gene first-corner box | robust three-lap `lap_time_score_v5` with GA | **Closed** at generation 1; decimal component rounding split equal tick totals |
+| `faster-line-v12` | v10's 16-gene first-corner box | exact-tick three-lap `lap_time_score_v6` with GA | **Closed** at generation 1; seed loader omitted the parent's fixed context |
+| `faster-line-v13` | v10's 16-gene first-corner box with complete checkpoint seeding | exact-tick three-lap `lap_time_score_v6` with GA | **Closed** at generation 30; generation 22 is clean on all 30 seeds at 24.150 s robust worst |
+| `faster-line-v14` | 3 long-sweeper activation/hold/speed-bonus parameters | exact-tick three-lap `lap_time_score_v6` with GA | **Closed** at generation 15; generation 5 is promoted at 23.983 s robust worst |
+| `faster-line-v15` | 4 sweeper entry-preview window/hold/bonus parameters | exact-tick three-lap `lap_time_score_v6` with GA | **Closed** at generation 37; generation 27 is clean on all 30 seeds at 1,432 ticks |
+| `faster-line-v16` | 2 launch-cap parameters, reopened below v10's pinned 2.5 s floor | exact-tick three-lap `lap_time_score_v6` with GA | **Closed** at generation 20; generation 10 is **promoted** at 1,427 ticks and 7.617 s official best lap |
+| `faster-line-v17` | v15's 4 preview genes and v16's 2 launch genes, jointly | equal-weight first+best `lap_time_score_v7` with GA | **Closed** at generation 10; zero improvement over its seed in any generation |
+| `faster-line-v18` | 1 default-off pose-invariant corner-exit speed bonus | equal-weight first+best `lap_time_score_v7` with GA | **Closed** at generation 11; every generation selected the default-off 0.0, rejecting the lever |
+| `faster-line-v19` | 2 parameters; reopens the corner-target floor and front-stop ceiling v13's elites pinned | equal-weight first+best `lap_time_score_v7` with GA | **Closed** at generation 16; generation 6 is **promoted** at 457 robust worst best-lap ticks |
+| `faster-line-v20` | 2 launch parameters, reopening v16's own box on both sides | equal-weight first+best `lap_time_score_v7` with GA | **Closed** at generation 11; every generation kept the seeded launch, establishing the 513-tick first-lap floor |
+| `faster-line-v21` | 2 parameters; retests the straight-speed ceiling under v19's slower corner approach | equal-weight first+best `lap_time_score_v7` with GA | **Discarded** at generation 19; it moved, but exposed the v7 ranking defect and its branch regresses best lap |
+| `faster-line-v22` | 4 parameters; the whole speed profile, jointly | best-lap-first `lap_time_score_v8` with GA | **Closed** at generation 11; every generation kept the seeded v19 values |
+| `faster-line-v23` | 2 line-timing parameters that finished exactly on a bound | best-lap-first `lap_time_score_v8` with GA | **Closed** at generation 14; broke the 457-tick floor on one seed, but not on any worst-case key, so not promoted |
 
 ## Train
 
@@ -438,6 +458,535 @@ the lower worker count are for.
 Generation 0 anchors on the promoted vector, so elitism holds 597.90 m as a
 floor. Promote only against the v2 incumbent's gates: 595.98 m official mean,
 596.55 m validation median, and 14 of 20 head-to-head wins.
+
+## The v4 campaign
+
+v3 finished with nine of sixteen genes on a bound, so v4 again moves bounds, and
+adds one structural gene.
+
+**Why the release rate exists.** The line target is a function of *instantaneous*
+curvature, so `turn_strength` collapses to zero wherever local curvature is low
+and the target is dragged back to the centreline, even when the next corner bends
+the same way and the car should simply stay out. Measured on the baked v3 vector
+at seed 110: it requests up to 2.97 m but achieves only 2.06 m at the ninetieth
+percentile, and sits within 0.5 m of the centreline for 39.9% of ticks. The taut
+shortest path inside this corridor instead stays pinned to one edge for 64 m at a
+stretch and is 12.2% shorter than the centreline.
+
+`line_target_release_per_tick` rate-limits the target moving back toward the
+centre *on the same side*, separately from the outward `line_target_slew_per_tick`.
+A crossing to the opposite side still uses the fast outward rate, so a genuine
+opposite corner is answered exactly as before. Setting release equal to slew
+reproduces v3, which is where generation 0 starts.
+
+```bash
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v4 \
+  --optimizer ga \
+  --objective improved \
+  --artifact-root artifacts/controller-search/faster-line-v4-ga \
+  --population 64 --elites 12 --generations 100 \
+  --optimizer-seed 590117 --workers 6
+```
+
+Create the artifact directory first (`mkdir -p`) if your shell autocorrects
+unknown paths, run on mains power, and **restart the process whenever generation
+time passes roughly 150 s** — see the note below on worker memory growth.
+
+## The v5-v7 campaigns
+
+The v5 run completed all 100 generations at a best penalized mean of 675.77 m,
+up 10.38 m (1.56%) from v4. Its winning vector first appeared at generation 84.
+The final population still had 0.369 normalized pairwise diversity and the GA
+had already expanded its mutation scale to the 0.35 maximum. More mutation in
+the same box is therefore unlikely to address the plateau.
+
+V6 changes the search structure instead. It makes `yaw_damping_gain`,
+`steer_slew_per_tick`, `curvature_heading_degrees`, and `yaw_speed_reduction`
+searchable, reopens the v5 limits on curvature response, heading gain, line-turn
+sensitivity, and target release, and fixes `maximum_racing_line_offset_ratio`
+at the measured-safe 0.95. Generation 0 is the baked v5 winner.
+
+The primary v6 branch ran for ten generations with optimizer seed 590119. It
+retained 0.487 normalized pairwise diversity and mutation inflated to 0.324,
+but no candidate beat the v5 anchor on any score component. It was stopped
+there instead of spending the planned 40 generations in a demonstrably flat
+box.
+
+A seed-110 trace then identified what v6 did not search: 23 AVOID ticks capped
+speed at 3.4 m/s and 77 more ticks invoked side slowdown. Relaxing only the
+AVOID thresholds increased distance from 653.98 m to 663.16 m cleanly. Raising
+the AVOID speed increased it to 658.41 m cleanly. A combined diagnostic reached
+a 7.883 s lap, down from 7.917 s, with 0.067 s of wall contact. Aggressively
+weakening side slowdown alone failed to finish a lap, so v7 searches these
+guards inside conservative bounds.
+
+V7 also introduces `lap-time`, a ranking objective that retains the existing
+survival, lap-completion, and incident-budget tiers, then minimizes worst,
+ninetieth-percentile, median, and mean best-lap time in that order. Penalized
+distance is only the last tie-breaker. Run at most 30 generations and stop early
+after ten or more flat generations:
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v7-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v7 \
+  --optimizer ga --objective lap-time \
+  --artifact-root artifacts/controller-search/faster-line-v7-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590120 --workers 4 --evaluator-recycle-trials 120
+```
+
+V7 was stopped at generation 27. Its real final winner has a 7.833 s robust
+worst lap, 7.817 s median, 7.812 s mean, 683.53 m penalized mean, and all 28
+trials inside every hard tier. Generation 26 exposed a ranking precision bug:
+lap times that differed by only about 5e-15 s were treated as materially
+different before median time was considered. V8 rounds measured lap times to
+six decimal places before ranking, seeds from generation 27, removes the two
+speed-reduction genes that stayed at zero, and moves the throttle, curvature,
+and wall thresholds v7 pressed.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v8-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v8 \
+  --optimizer ga --objective lap-time-v2 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v7-ga/generations/generation-027.json \
+  --artifact-root artifacts/controller-search/faster-line-v8-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590121 --workers 4 --evaluator-recycle-trials 120
+```
+
+The evaluator-object recycle does not return RSS to macOS. Restart the complete
+command at generations 10 and 20; exact checkpoint resume releases worker
+memory without changing optimizer state.
+
+V8's training winner reached a 7.783 s worst and 7.767 s median best lap, but it
+was not promotable. Two training seeds had small incidents, and the seed-110
+gate exposed the underlying exploit: 0.246 damage, 1.133 s contact, 365 AVOID
+ticks, a 21.65 s first lap, and only 379.88 m before it recovered and set one
+7.800 s lap. V9 rejects that failure mode before comparing best-lap time: after
+survival, lap, and incident tiers, it ranks three-lap completion and completely
+clean trials. It restarts from v7 generation 27, whose training suite was clean.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v9-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v9 \
+  --optimizer ga --objective lap-time-v3 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v7-ga/generations/generation-027.json \
+  --artifact-root artifacts/controller-search/faster-line-v9-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590122 --workers 4 --evaluator-recycle-trials 120
+```
+
+V9 completed 30 generations. Generation 26 was the winner: all 28 training
+trials were clean and completed at least three laps, with a 7.783 s robust
+worst/median best lap and 686.56 m mean distance. The second official seed also
+ran clean at 7.783 s, but seed 110 exposed a first-turn correction: the car
+entered AVOID at 19.5 m/s, contacted the wall for 0.150 s, took 9.967 s for lap
+one, and covered 645.01 m.
+
+A default-off launch cap fixes that specific transient without slowing later
+laps. At 19 m/s for only the first 3.5 s, the same seed-110 vector ran clean,
+cut lap one to 8.667 s, set a 7.783 s best lap, and covered 679.47 m. V10 makes
+the cap and duration searchable, reopens only the active corner/wall dynamics,
+and evaluates the two official seeds alongside all 28 training seeds. Its v4
+objective keeps v9's safety/three-lap/clean tiers, then ranks robust best-lap
+time, robust first-lap time, and distance.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v10-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v10 \
+  --optimizer ga --objective lap-time-v4 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v9-ga/generations/generation-026.json \
+  --artifact-root artifacts/controller-search/faster-line-v10-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590123 --workers 4 --evaluator-recycle-trials 120
+```
+
+On this machine, restart the complete command after every five completed v10
+generations: v9 workers reached roughly 2.0-3.1 GB each in a five-generation
+pool lifetime. Exact checkpoint resume preserves the optimizer state.
+
+V10 stopped at generation 7 because its ranking exposed a bad trade: a one-tick
+repeated-lap gain outranked a 1.3 s slower first lap. That candidate remained
+clean, but its 10.233 s worst first lap and 673.40 m mean were worse race pace
+than generation 4's 8.917 s and 683.59 m. V11 uses the same measured search box
+but ranks robust estimated three-lap time (`first_lap + 2 * best_lap`) before
+separate repeated/first-lap components. Generation 4 is the seed: its composite
+worst is 24.450 s, versus 24.583 s at generation 5 and 25.767 s at generation 7.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v11-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v11 \
+  --optimizer ga --objective lap-time-v5 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v10-ga/generations/generation-004.json \
+  --artifact-root artifacts/controller-search/faster-line-v11-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590124 --workers 4 --evaluator-recycle-trials 120
+```
+
+V11 stopped after generation 1. Its winner and the generation-4 parent both
+have a worst estimated three-lap total of exactly 1,467 simulator ticks, but
+rounding each constituent lap to six decimal seconds produced 24.449999 versus
+24.450001 and selected the worse distribution. V12 converts every measured lap
+to an integer 60 Hz tick count before summing or ranking; equal physical totals
+therefore tie exactly.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v12-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v12 \
+  --optimizer ga --objective lap-time-v6 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v10-ga/generations/generation-004.json \
+  --artifact-root artifacts/controller-search/faster-line-v12-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590125 --workers 4 --evaluator-recycle-trials 120
+```
+
+V12 stopped after generation 1 because `--seed-checkpoint` restored only the
+searched vector and ignored `checkpoint_context`. The resulting centre had the
+right 16 genes but stale fixed values—for example, straight target 24.674
+instead of 25.076 m/s and front-brake start 12.406 instead of 11.919 m—so it was
+not the archived parent. The loader now merges fixed context first and searched
+values second, with regression coverage. V13 is the clean restart.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v13-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v13 \
+  --optimizer ga --objective lap-time-v6 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v10-ga/generations/generation-004.json \
+  --artifact-root artifacts/controller-search/faster-line-v13-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590126 --workers 4 --evaluator-recycle-trials 120
+```
+
+V13 completed all 30 generations. Generation 22 won with every training and
+official seed clean: its robust three-lap worst/median are 1,449/1,445 ticks
+(24.150/24.083 s), versus 1,467/1,455.5 ticks for its v10 parent. A seed-110
+trace then showed the car coasting through the only sustained 2.38 s sweeper.
+Global exit-line offsets and slower line release were rejected because they
+lost 2-126 m or caused contact. A default-off speed bonus, activated only after
+a sustained same-direction turn, generalized: the measured 1.5 m/s bonus after
+1.7 s with a 0.9 s hold kept all 30 seeds clean, improved the robust worst to
+1,443 ticks (24.050 s), and raised mean distance from 688.57 to 692.37 m.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v14-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v14 \
+  --optimizer ga --objective lap-time-v6 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v13-ga/generations/generation-022.json \
+  --artifact-root artifacts/controller-search/faster-line-v14-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590127 --workers 4 --evaluator-recycle-trials 120
+```
+
+V14 stopped after generation 15 because generations 6-15 were exactly flat.
+Generation 5 won with a 2.148 s sustained-turn activation, 0.344 s release
+hold, and 2.109 m/s speed bonus. It remained clean on all 30 search seeds and
+improved robust worst three-lap time to 1,439 ticks (23.983 s), ten ticks faster
+than v13 and 28 ticks faster than the complete v10 parent. The baked controller
+then passed 2/2 official, 12/12 validation, and 100/100 clean soak trials plus
+the 20-race head-to-head gate at 18 wins. Its best official lap is 7.650 s.
+
+
+### V15 - sweeper entry preview
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v15-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v15 \
+  --optimizer ga --objective lap-time-v6 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v14-ga/generations/generation-005.json \
+  --artifact-root artifacts/controller-search/faster-line-v15-ga \
+  --population 64 --elites 12 --generations 40 \
+  --optimizer-seed 590128 --workers 4 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 37; generations 28-37 were exactly flat. Generation 27
+holds a 0.1067-0.1454 far-curvature window, a 1.151 s hold, and a 1.530 m/s
+bonus, clean on all 30 seeds at 1,432 robust worst ticks.
+
+### V16 - reopening the pinned launch floor
+
+V13's twelve elites pinned `startup_speed_cap_seconds` at exactly 2.5000, the
+floor of v10's box. V16 reopens that gene below its own floor and nothing else.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v16-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v16 \
+  --optimizer ga --objective lap-time-v6 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v15-ga/generations/generation-027.json \
+  --artifact-root artifacts/controller-search/faster-line-v16-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590129 --workers 4 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 20; generations 11-20 were exactly flat. Generation 10
+caps the launch at 22.774 m/s for 1.993 s, improving robust worst three-lap time
+to 1,427 ticks and worst first lap from 518 to 513 ticks. **This is the promoted
+vector**: 7.617 s official best lap, 100/100 clean soak, 18/20 head-to-head.
+
+### V17 - joint re-ranking, falsified
+
+The three-lap objective weights repeated pace twice, so `lap-time-v7` was added
+to rank worst first+best ticks ahead of either component. V17 reopens all six
+preview and launch genes jointly under it.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v17-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v17 \
+  --optimizer ga --objective lap-time-v7 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v16-ga/generations/generation-010.json \
+  --artifact-root artifacts/controller-search/faster-line-v17-ga \
+  --population 64 --elites 12 --generations 30 \
+  --optimizer-seed 590130 --workers 4 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 10 with **zero** improvement in any generation: the
+seeded v16 incumbent won generation 1 and was never beaten. Re-ranking existing
+genes moves nothing, so later versions must add an unsearched lever or reopen a
+binding bound rather than re-mutate the same box.
+
+### V18 - the corner-exit speed bonus
+
+A new default-off, pose-invariant lever: accelerate as near curvature unwinds
+relative to far curvature, instead of waiting for the whole speed scalar to fall
+back toward straight-line pace. One gene, so the population is halved.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v18-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v18 \
+  --optimizer ga --objective lap-time-v7 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v16-ga/generations/generation-010.json \
+  --artifact-root artifacts/controller-search/faster-line-v18-ga \
+  --population 32 --elites 8 --generations 30 \
+  --optimizer-seed 590131 --workers 5 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 11; generations 2-11 were exactly flat. **Every**
+generation selected `corner_exit_target_speed_bonus_mps = 0.0` - the default-off
+value - so no positive bonus anywhere in the 0.0-3.0 m/s range beat switching the
+lever off. The hypothesis is rejected, not merely untuned. The parameter stays in
+`ControllerParameters` at its 0.0 default and costs nothing at runtime.
+
+### V19 - reopening the last two pinned bounds
+
+V13's elites pinned two more genes exactly against their box: the winning
+`corner_target_speed_mps` sat on the 14.0 m/s floor and `front_stop_m` on the
+1.60 m ceiling. Both shape the same corner approach, so v19 searches them
+together, releasing the corner target down to 11.0 m/s and the front stop up to
+2.60 m - back toward the 2.5-3.0 m ceilings v5-v7 used before v10 narrowed the
+box. This is the same signature v16 converted into twelve ticks.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v19-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v19 \
+  --optimizer ga --objective lap-time-v7 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v16-ga/generations/generation-010.json \
+  --artifact-root artifacts/controller-search/faster-line-v19-ga \
+  --population 48 --elites 10 --generations 30 \
+  --optimizer-seed 590132 --workers 5 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 16; generations 7-16 were exactly flat. It improved in
+**six of its first six generations**. Generation 6 settles at
+`corner_target_speed_mps=13.744` and `front_stop_m=2.037` - both outside the box
+v10 gave them, which is the direct confirmation that the bounds, not the
+controller, were the limit. Robust worst best lap went 461 to **457 ticks**
+(7.683 to 7.617 s), and mean best-lap ticks hit exactly 457.0, so every one of
+the 30 search seeds reaches the same best lap. **This is the promoted vector**:
+100/100 clean soak, 19/20 head-to-head, and better than baked v16 on official,
+validation, and soak distance with no regression anywhere.
+
+### V20 - the frozen first lap
+
+Worst first-lap time has read 513 ticks in v16, v17, v18, and v19 alike. The
+launch genes are the only family that has ever moved it (v16 took it from 518),
+and v16's own box is now partly pinned: four of twelve elites finished on the
+1.85 s floor and the winning cap sits within a tenth of the 22.9 m/s ceiling.
+V20 reopens that box on both sides while holding v19's corner genes fixed.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v20-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v20 \
+  --optimizer ga --objective lap-time-v7 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v19-ga/generations/generation-006.json \
+  --artifact-root artifacts/controller-search/faster-line-v20-ga \
+  --population 48 --elites 10 --generations 30 \
+  --optimizer-seed 590133 --workers 5 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 11 with **zero** improvement: all eleven generations kept
+the seeded 22.774 m/s cap held 1.993 s, and nothing in the widened box beat it.
+The partial pin that motivated the run - four of twelve v16 elites on the 1.85 s
+floor - did not reproduce as a real bound. Treat 513 ticks as this controller's
+first-lap floor and stop attacking the launch.
+
+Note that a bound sitting at a *physical* limit is not a lever either. Three line
+genes read as pinned (`maximum_racing_line_offset_ratio` and
+`racing_line_entry_offset_ratio` at 0.95, `racing_line_exit_offset_ratio` at 0.0),
+but `center_offset_cap_m` is 3.3 m - exactly the corridor half-width - so 0.95
+already requests a line 3.135 m out and 1.0 is the wall itself. Check what a bound
+means physically before reopening it.
+
+### V21 - the straight-speed ceiling, retested
+
+D-040 rejected 26-27 m/s straight targets for causing wall contact. That was
+measured against the old corner approach: a 14.0 m/s corner target braking to a
+1.60 m front stop. V19 replaced both with 13.744 m/s and 2.037 m, so the car now
+arrives slower and brakes earlier, and the rejection's premise no longer holds.
+V21 retests the ceiling with the brake ramp free to start beyond v4's 14.0 m.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v21-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v21 \
+  --optimizer ga --objective lap-time-v7 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v19-ga/generations/generation-006.json \
+  --artifact-root artifacts/controller-search/faster-line-v21-ga \
+  --population 48 --elites 10 --generations 30 \
+  --optimizer-seed 590134 --workers 5 --evaluator-recycle-trials 120
+```
+
+V21 did move - generation 17 improved worst first+best from 970 to 969 ticks, and
+generation 19 reached mean best-lap 456.93, so at least one seed broke the 457
+floor - but it also exposed a defect in the ranking itself.
+
+## The v7 ranking defect, and `lap-time-v8`
+
+`lap_time_score_v7` ranks `max(first+best)`, then `max(first)`, then `max(best)`.
+At v21 generation 11 the search moved 513+457 to 512+458. Both sum to 970, so the
+primary key tied and the comparison fell through to first lap, where 512 beats
+513 - while best lap quietly got worse. Best lap is the third key and is never
+consulted once an earlier key breaks the tie.
+
+With the sum pinned, that makes the two laps a zero-sum trade the search will
+happily take: it banks a first-lap tick by spending a best-lap tick, every time,
+and scores each trade as an improvement. Symptom to watch for: first lap creeping
+down while best lap creeps up, with the sum never moving.
+
+`lap_time_score_v8` leads with `max(best)`, then `max(first)`, then the sum. Best
+lap is also the better primary on its own terms - a thirty-second trial runs
+three laps, so a repeated lap counts twice against the first lap once.
+`test_lap_time_score_v8_refuses_to_trade_best_lap_for_first_lap` pins the exact
+513+457 versus 512+458 pair so the regression cannot return.
+
+### V22 - the whole speed profile, re-searched under v8
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v22-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v22 \
+  --optimizer ga --objective lap-time-v8 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v19-ga/generations/generation-006.json \
+  --artifact-root artifacts/controller-search/faster-line-v22-ga \
+  --population 64 --elites 12 --generations 40 \
+  --optimizer-seed 590135 --workers 5 --evaluator-recycle-trials 120
+```
+
+Stopped after generation 11 with **zero** improvement: all four pace genes stayed
+exactly at the seeded v19 values, and mean best-lap was exactly 457.0, meaning all
+30 seeds hit the same lap. Under a ranking that cannot trade best lap away, the
+speed profile has nothing left. 457 ticks is a floor of the policy, not of the
+search.
+
+### V23 - line timing, the last untouched dimension
+
+Speed, launch, and line magnitude are each now measured as exhausted. Magnitude is
+genuinely capped: `center_offset_cap_m` is the 3.3 m corridor half-width, so the
+0.95 clamp already requests 3.135 m and 1.0 is the wall. Timing is not capped, and
+two of its genes finished exactly on a bound - `line_turn_sensitivity` on its
+0.002 floor, meaning the search wanted an even sharper response than a box that
+already commands full offset for the gentlest curvature, and
+`line_target_release_per_tick` on its 0.25 ceiling, meaning it wanted the target
+to relax faster than allowed.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v23-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v23 \
+  --optimizer ga --objective lap-time-v8 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v19-ga/generations/generation-006.json \
+  --artifact-root artifacts/controller-search/faster-line-v23-ga \
+  --population 48 --elites 10 --generations 30 \
+  --optimizer-seed 590136 --workers 5 --evaluator-recycle-trials 120
+```
+
+When chaining presets this deep, check that the fixed context is complete before
+launching: each preset deletes the genes it searches, so a later preset that
+searches none of them must add every one back or the run silently reverts it to a
+base default. `test_faster_line_v23_reopens_the_pinned_line_timing_bounds` caught
+exactly that, which is the same failure that cost v12 its run.
+
+Stopped after generation 14; generations 5-14 were exactly flat. Generation 4
+reached `line_turn_sensitivity` 0.00055, **below the old 0.002 floor**, which
+confirms that floor was binding, and broke the 457-tick uniformity for the first
+time: mean best-lap fell from 457.000 to 456.933, meaning one of the thirty seeds
+reached 456 ticks (7.600 s).
+
+It was **not promoted.** The gain is one tick on one seed of thirty; it sits below
+every worst-case key in the ranking (best lap 457, first lap 513, first+best 970
+are all unchanged); and mean distance regressed from 700.465 to 700.30 m. That
+does not justify re-running the promotion gates, so `race_faster` still carries
+v19 generation 6. The checkpoint is retained if the direction is picked up again -
+note that `line_target_release_per_tick` barely moved (0.2500 to 0.2495), so
+sensitivity is the live half of the pair and deserves a run of its own.
+
+### Finding the next revision
+
+When a run stops on the plateau rule, do not extend it and do not reach for a new
+lever first. Ask the closed run which of its own bounds it was pushing against:
+a gene whose winner sits *exactly* on its floor or ceiling is measured evidence
+that the box, not the controller, is the limit.
+
+```bash
+PYTHONPATH="$PWD" uv run python - \
+  artifacts/controller-search/faster-line-v13-ga/checkpoint.json faster-line-v13 <<'EOF'
+import json, sys
+from scripts.controller_training.search import preset_configuration
+checkpoint, preset = sys.argv[1], sys.argv[2]
+d = json.load(open(checkpoint))
+names, elites, win = d["parameter_names"], d["elite_values"], d["best_parameter_vector"]
+spec = {s.name: s for s in preset_configuration(preset)[1].specs}
+for i, n in enumerate(names):
+    s, w = spec[n], win[n]
+    lo = sum(1 for row in elites if abs(row[i] - s.minimum) <= 1e-9)
+    hi = sum(1 for row in elites if abs(row[i] - s.maximum) <= 1e-9)
+    flag = ("WINNER ON FLOOR" if abs(w - s.minimum) <= 1e-9 else
+            "WINNER ON CEILING" if abs(w - s.maximum) <= 1e-9 else "")
+    print(f"{n:38s} [{s.minimum:8.3f},{s.maximum:8.3f}] win {w:9.4f} "
+          f"elites@floor {lo:2d} @ceil {hi:2d}  {flag}")
+EOF
+```
+
+On v13's closed checkpoint this prints four pinned genes, and the record since is
+unambiguous:
+
+| Pinned gene | Reopened by | Result |
+| --- | --- | --- |
+| `startup_speed_cap_seconds` on its 2.5 s floor (8/12 elites) | v16 | Landed at 1.993 s; **+12 ticks**, promoted |
+| `corner_target_speed_mps` on its 14.0 m/s floor | v19 | Landed at 13.647 m/s, outside the old box |
+| `front_stop_m` on its 1.60 m ceiling | v19 | Landed at 1.939 m, outside the old box |
+| `avoid_side_wall_m` on its 0.60 m floor (4/12 elites) | *deliberately not reopened* | D-033 rejected 0.50 as the crash-then-sprint optimum; this floor is a safety constraint, not a search artifact |
+
+The two revisions that instead re-ranked existing genes (v17) or added a brand
+new lever (v18) each returned **exactly zero** over ten-plus generations. Reopen a
+measured bound before inventing a mechanism, and never reopen a bound that an
+earlier decision row put there on purpose.
+
+### Stopping rule
+
+`search` has no built-in plateau stop; every generation is archived and the run
+resumes from its checkpoint, so campaigns are stopped by hand. Stop a run once
+ten consecutive generations pass without the archived `best_score` improving,
+then revise rather than extend. Check the current count with:
+
+```bash
+uv run python - artifacts/controller-search/faster-line-v19-ga <<'EOF'
+import json, sys, glob, os
+root = sys.argv[1]
+files = sorted(glob.glob(os.path.join(root, "generations", "*.json")))
+gens = [json.load(open(f)) for f in files]
+best, last = tuple(gens[0]["best_score"]), gens[0]["generation"]
+for g in gens[1:]:
+    if tuple(g["best_score"]) > best:
+        best, last = tuple(g["best_score"]), g["generation"]
+print(f"latest={gens[-1]['generation']} last_improved={last} flat={gens[-1]['generation'] - last}")
+EOF
+```
 
 ## Bake the best vector into source
 

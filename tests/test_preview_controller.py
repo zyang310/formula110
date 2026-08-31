@@ -210,6 +210,35 @@ def test_speed_command_uses_unclamped_speed_above_the_normalization_cap() -> Non
     assert command.throttle == 0.0
 
 
+def test_startup_speed_cap_only_limits_the_configured_opening_seconds() -> None:
+    parameters = ControllerParameters(
+        straight_target_speed_mps=25.0,
+        startup_speed_cap_mps=18.0,
+        startup_speed_cap_seconds=3.5,
+        throttle_gain=1.0,
+    )
+    early = PreviewController(parameters)
+    late = PreviewController(parameters)
+
+    early_command = early(
+        RobotSensors(
+            dt_s=1.0 / 60.0,
+            tick=120,
+            odometry=OdometrySensors(speed_mps=19.0),
+        )
+    )
+    late_command = late(
+        RobotSensors(
+            dt_s=1.0 / 60.0,
+            tick=240,
+            odometry=OdometrySensors(speed_mps=19.0),
+        )
+    )
+
+    assert early_command.throttle == 0.0
+    assert late_command.throttle > 0.0
+
+
 def test_controller_still_brakes_during_avoidance() -> None:
     controller = PreviewController(ControllerParameters())
     sensors = RobotSensors(
@@ -570,6 +599,11 @@ def _v2_line_controller(
     line_target_slew_per_tick: float = 1.0,
     line_clearance_m: float = 0.0,
     maximum_racing_line_offset_ratio: float = MAX_RACING_LINE_OFFSET_RATIO,
+    line_target_release_per_tick: float | None = None,
+    sweeper_minimum_duration_s: float = 0.0,
+    sweeper_speed_hold_seconds: float = 0.0,
+    sweeper_target_speed_bonus_mps: float = 0.0,
+    initialize_line_target_from_preview: bool = False,
 ) -> PreviewController:
     return PreviewController(
         ControllerParameters(
@@ -588,6 +622,11 @@ def _v2_line_controller(
             line_turn_sensitivity=0.03,
             maximum_racing_line_offset_ratio=maximum_racing_line_offset_ratio,
             line_target_slew_per_tick=line_target_slew_per_tick,
+            line_target_release_per_tick=line_target_release_per_tick,
+            sweeper_minimum_duration_s=sweeper_minimum_duration_s,
+            sweeper_speed_hold_seconds=sweeper_speed_hold_seconds,
+            sweeper_target_speed_bonus_mps=sweeper_target_speed_bonus_mps,
+            initialize_line_target_from_preview=initialize_line_target_from_preview,
             line_clearance_m=line_clearance_m,
             wall_balance_gain=0.0,
             normal_steer_limit=1.0,
@@ -818,3 +857,249 @@ def _straightest_progress_m(model: TrackProgressModel) -> float:
         if curvature < best_curvature:
             best_curvature, best_progress_m = curvature, progress_m
     return best_progress_m
+
+
+CORNER_AHEAD = RobotSensors(camera=CameraSensors(lookahead_offsets_m=(0.0, 0.30, 2.20)))
+STRAIGHT = RobotSensors(camera=CameraSensors(lookahead_offsets_m=(0.0, 0.0, 0.0)))
+OPPOSITE_CORNER = RobotSensors(camera=CameraSensors(lookahead_offsets_m=(0.0, -0.30, -2.20)))
+
+
+def test_release_rate_defaults_to_the_outward_slew() -> None:
+    assert ControllerParameters().line_target_release_per_tick is None
+
+    symmetric = _v2_line_controller(entry=0.65, line_target_slew_per_tick=0.10)
+    explicit = _v2_line_controller(entry=0.65, line_target_slew_per_tick=0.10, line_target_release_per_tick=0.10)
+    for _ in range(10):
+        symmetric(CORNER_AHEAD)
+        explicit(CORNER_AHEAD)
+    for _ in range(5):
+        symmetric(STRAIGHT)
+        explicit(STRAIGHT)
+
+    assert symmetric.state.line_target == pytest.approx(explicit.state.line_target)
+
+
+def test_a_slow_release_holds_the_line_through_a_straight() -> None:
+    """The behaviour the taut in-corridor path needs and v3 could not express."""
+    holding = _v2_line_controller(entry=0.65, line_target_slew_per_tick=0.20, line_target_release_per_tick=0.002)
+    releasing = _v2_line_controller(entry=0.65, line_target_slew_per_tick=0.20, line_target_release_per_tick=0.20)
+    for _ in range(10):
+        holding(CORNER_AHEAD)
+        releasing(CORNER_AHEAD)
+    committed = holding.state.line_target
+    assert committed < -0.30, committed
+
+    for _ in range(20):
+        holding(STRAIGHT)
+        releasing(STRAIGHT)
+
+    # The releasing controller is dragged back to the centreline; the holding one
+    # keeps almost all of the offset it worked for.
+    assert releasing.state.line_target == pytest.approx(0.0, abs=1e-9)
+    assert holding.state.line_target < committed * 0.85, holding.state.line_target
+
+
+def test_release_rate_never_slows_a_crossing_to_the_other_side() -> None:
+    """An opposite corner must still be answered at the fast outward rate."""
+    controller = _v2_line_controller(entry=0.65, line_target_slew_per_tick=0.20, line_target_release_per_tick=0.002)
+    for _ in range(10):
+        controller(CORNER_AHEAD)
+    committed = controller.state.line_target
+    assert committed < -0.30, committed
+
+    controller(OPPOSITE_CORNER)
+
+    # One tick of the fast rate, not the slow one.
+    moved = controller.state.line_target - committed
+    assert moved == pytest.approx(0.20, abs=1e-9), moved
+
+
+def test_sweeper_speed_bonus_is_default_off() -> None:
+    controller = _v2_line_controller(apex=0.4, entry=0.4)
+    sustained_left = RobotSensors(camera=CameraSensors(lookahead_offsets_m=(-0.5, -2.0, -5.0)))
+
+    for _ in range(120):
+        controller(sustained_left)
+
+    assert controller.state.sweeper_turn_seconds == 0.0
+    assert controller.state.sweeper_speed_hold_seconds == 0.0
+
+
+def test_sweeper_speed_bonus_holds_through_straight_and_cancels_on_opposite_turn() -> None:
+    controller = _v2_line_controller(
+        apex=0.4,
+        entry=0.4,
+        line_target_slew_per_tick=1.0,
+        sweeper_minimum_duration_s=0.05,
+        sweeper_speed_hold_seconds=0.20,
+        sweeper_target_speed_bonus_mps=1.0,
+    )
+    sustained_left = RobotSensors(
+        dt_s=1.0 / 60.0,
+        camera=CameraSensors(lookahead_offsets_m=(-0.5, -2.0, -5.0)),
+    )
+    sustained_right = RobotSensors(
+        dt_s=1.0 / 60.0,
+        camera=CameraSensors(lookahead_offsets_m=(0.5, 2.0, 5.0)),
+    )
+    straight = RobotSensors(dt_s=1.0 / 60.0)
+
+    for _ in range(4):
+        controller(sustained_left)
+
+    assert controller.state.sweeper_speed_hold_direction == -1.0
+    assert controller.state.sweeper_speed_hold_seconds > 0.0
+
+    for _ in range(4):
+        controller(straight)
+
+    assert controller.state.sweeper_speed_hold_seconds > 0.0
+
+    controller(sustained_right)
+
+    assert controller.state.sweeper_speed_hold_seconds == 0.0
+    assert controller.state.sweeper_speed_hold_direction == 0.0
+
+
+def test_sweeper_speed_bonus_activates_only_after_sustained_turn() -> None:
+    parameters = ControllerParameters(
+        pose_invariant_racing_line=True,
+        straight_target_speed_mps=10.0,
+        corner_target_speed_mps=10.0,
+        steering_speed_reduction=0.0,
+        throttle_gain=1.0,
+        sweeper_minimum_duration_s=0.05,
+        sweeper_speed_hold_seconds=0.20,
+        sweeper_target_speed_bonus_mps=2.0,
+    )
+    controller = PreviewController(parameters)
+    sustained_left = RobotSensors(
+        dt_s=1.0 / 60.0,
+        odometry=OdometrySensors(speed_mps=10.5),
+        camera=CameraSensors(lookahead_offsets_m=(-0.5, -2.0, -5.0)),
+    )
+
+    assert controller(sustained_left).throttle == 0.0
+    assert controller(sustained_left).throttle == 0.0
+    assert controller(sustained_left).throttle > 0.0
+
+
+def test_sweeper_preview_bonus_arms_on_broad_entry_band() -> None:
+    parameters = ControllerParameters(
+        pose_invariant_racing_line=True,
+        straight_target_speed_mps=10.0,
+        corner_target_speed_mps=10.0,
+        steering_speed_reduction=0.0,
+        throttle_gain=1.0,
+        sweeper_preview_minimum_far_curvature=0.10,
+        sweeper_preview_maximum_far_curvature=0.14,
+        sweeper_preview_speed_hold_seconds=0.20,
+        sweeper_preview_target_speed_bonus_mps=2.0,
+    )
+    controller = PreviewController(parameters)
+    broad_entry = RobotSensors(
+        dt_s=1.0 / 60.0,
+        odometry=OdometrySensors(speed_mps=10.5),
+        camera=CameraSensors(lookahead_offsets_m=(0.4, 1.175, -2.95)),
+    )
+
+    command = controller(broad_entry)
+
+    assert controller.state.sweeper_preview_speed_hold_seconds == 0.20
+    assert controller.state.sweeper_preview_hold_direction == -1.0
+    assert command.throttle > 0.0
+
+
+def test_sweeper_preview_bonus_rejects_tighter_entry_and_cancels_on_opposite_turn() -> None:
+    parameters = ControllerParameters(
+        pose_invariant_racing_line=True,
+        straight_target_speed_mps=10.0,
+        corner_target_speed_mps=10.0,
+        steering_speed_reduction=0.0,
+        throttle_gain=1.0,
+        sweeper_preview_minimum_far_curvature=0.10,
+        sweeper_preview_maximum_far_curvature=0.14,
+        sweeper_preview_speed_hold_seconds=0.20,
+        sweeper_preview_target_speed_bonus_mps=2.0,
+    )
+    controller = PreviewController(parameters)
+    broad_entry = RobotSensors(
+        dt_s=1.0 / 60.0,
+        odometry=OdometrySensors(speed_mps=10.5),
+        camera=CameraSensors(lookahead_offsets_m=(0.4, 1.175, -2.95)),
+    )
+    tight_entry = RobotSensors(
+        dt_s=1.0 / 60.0,
+        odometry=OdometrySensors(speed_mps=10.5),
+        camera=CameraSensors(lookahead_offsets_m=(0.4, 1.175, -4.88)),
+    )
+    opposite_turn = RobotSensors(
+        dt_s=1.0 / 60.0,
+        odometry=OdometrySensors(speed_mps=10.5),
+        camera=CameraSensors(lookahead_offsets_m=(0.5, 2.0, 5.0)),
+    )
+
+    assert controller(tight_entry).throttle == 0.0
+    assert controller.state.sweeper_preview_speed_hold_seconds == 0.0
+
+    controller(broad_entry)
+    controller(opposite_turn)
+
+    assert controller.state.sweeper_preview_speed_hold_seconds == 0.0
+    assert controller.state.sweeper_preview_hold_direction == 0.0
+
+
+def test_corner_exit_bonus_tracks_pose_invariant_exit_phase() -> None:
+    parameters = ControllerParameters(
+        straight_target_speed_mps=10.0,
+        corner_target_speed_mps=10.0,
+        steering_speed_reduction=0.0,
+        throttle_gain=1.0,
+        corner_exit_target_speed_bonus_mps=2.0,
+    )
+    controller = PreviewController(parameters)
+
+    controller._update_corner_exit_speed_state((-0.12, -0.02))
+    features = build_preview_features(
+        RobotSensors(odometry=OdometrySensors(speed_mps=10.5)),
+        parameters,
+    )
+    throttle, target_speed = controller._speed_command(
+        features,
+        curvature=0.0,
+        steer=0.0,
+        avoiding=False,
+        startup_speed_cap_mps=None,
+    )
+
+    assert controller.state.corner_exit_speed_bonus_factor == 1.0
+    assert target_speed == 12.0
+    assert throttle > 0.0
+
+    controller._update_corner_exit_speed_state((-0.02, -0.12))
+
+    assert controller.state.corner_exit_speed_bonus_factor == 0.0
+
+
+def test_line_target_can_initialize_from_the_first_preview() -> None:
+    cold = _v2_line_controller(
+        apex=0.8,
+        entry=0.8,
+        exit=0.8,
+        line_target_slew_per_tick=0.01,
+    )
+    warm = _v2_line_controller(
+        apex=0.8,
+        entry=0.8,
+        exit=0.8,
+        line_target_slew_per_tick=0.01,
+        initialize_line_target_from_preview=True,
+    )
+    corner = RobotSensors(camera=CameraSensors(lookahead_offsets_m=(0.5, 2.0, 5.0)))
+
+    cold(corner)
+    warm(corner)
+
+    assert abs(cold.state.line_target) == 0.01
+    assert abs(warm.state.line_target) > abs(cold.state.line_target)
+    assert warm.state.line_target_initialized

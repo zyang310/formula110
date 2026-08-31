@@ -15,6 +15,9 @@ MAX_RACING_LINE_OFFSET_RATIO: float = 0.65
 # transition; blending entry directly with the opposite-sign apex target here
 # made the requested outside line disappear before the car could reach it.
 LINE_PHASE_TRANSITION_RATIO: float = 0.25
+# Ignore straight-line camera noise when deciding whether one turn direction has
+# persisted long enough to be treated as a sweeper.
+SWEEPER_ACTIVE_CURVATURE: float = 0.02
 
 
 class ControlMode(Enum):
@@ -65,6 +68,38 @@ class ControllerParameters:
     pose_invariant_speed_curvature: bool = False
     line_turn_sensitivity: float = 1.0
     line_target_slew_per_tick: float = 1.0
+    # Seed the tracked racing-line target from the first available preview
+    # instead of treating the centreline as prior state.  Steering still uses
+    # its independent slew limiter.  Default-off preserves existing presets.
+    initialize_line_target_from_preview: bool = False
+    # Rate limit for the target moving back *toward* the centreline while staying
+    # on the same side, separate from the outward rate above.  The phase target
+    # is a function of instantaneous curvature, so it collapses to zero whenever
+    # local curvature is low and drags the car back to the centre even when the
+    # next corner bends the same way and it should simply stay out there.  On
+    # this track the shortest in-corridor path sits pinned to one edge for 64 m
+    # at a stretch, which the symmetric rate cannot express.  A crossing to the
+    # opposite side still uses the fast outward rate, so response to a genuine
+    # opposite corner is unchanged.  None means "same rate as the outward slew",
+    # which reproduces the symmetric behaviour exactly.
+    line_target_release_per_tick: float | None = None
+    # Add speed only after one turn direction has persisted long enough to be a
+    # broad sweeper.  The short hold carries the bonus through its exit without
+    # raising the global straight/corner targets.  All values are default-off.
+    sweeper_minimum_duration_s: float = 0.0
+    sweeper_speed_hold_seconds: float = 0.0
+    sweeper_target_speed_bonus_mps: float = 0.0
+    # Preview a broad sweeper from the entry geometry instead of waiting until
+    # the turn has already persisted.  The far local curvature must dominate
+    # the opposite-sign near curvature and sit inside this band.  All four
+    # values are default-off so existing presets remain bit-for-bit unchanged.
+    sweeper_preview_minimum_far_curvature: float = 0.0
+    sweeper_preview_maximum_far_curvature: float = 0.0
+    sweeper_preview_speed_hold_seconds: float = 0.0
+    sweeper_preview_target_speed_bonus_mps: float = 0.0
+    # Add speed in proportion to the pose-invariant corner-exit phase.  The
+    # bonus is default-off and shares the existing non-stacking bonus envelope.
+    corner_exit_target_speed_bonus_mps: float = 0.0
     line_clearance_m: float = 0.0
     wall_balance_gain: float = 0.38
     normal_steer_limit: float = 0.92
@@ -75,6 +110,12 @@ class ControllerParameters:
     curvature_lateral_ratio: float = 0.58
     straight_target_speed_mps: float = 11.0
     corner_target_speed_mps: float = 6.4
+    # Optional launch-only cap.  The first corner can arrive before the tracked
+    # racing-line target has settled from its initial zero state; limiting only
+    # that approach avoids paying for a wall-recovery correction without
+    # slowing later laps.  Either zero value disables the behavior.
+    startup_speed_cap_mps: float = 0.0
+    startup_speed_cap_seconds: float = 0.0
     steering_speed_reduction: float = 0.28
     yaw_speed_reduction: float = 0.22
     # Distance at which the throttle starts lifting, not braking; the name predates
@@ -153,6 +194,14 @@ class ControllerState:
     recovery_seconds: float = 0.0
     recovery_steer: float = 0.0
     line_target: float = 0.0
+    line_target_initialized: bool = False
+    sweeper_turn_direction: float = 0.0
+    sweeper_turn_seconds: float = 0.0
+    sweeper_speed_hold_direction: float = 0.0
+    sweeper_speed_hold_seconds: float = 0.0
+    sweeper_preview_hold_direction: float = 0.0
+    sweeper_preview_speed_hold_seconds: float = 0.0
+    corner_exit_speed_bonus_factor: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,17 +237,38 @@ class PreviewController:
         self._update_stall_state(sensors, features)
         self._select_mode(features, sensors.dt_s)
 
-        racing_steer, curvature, steering_diagnostics = self._preview_steer(features)
+        startup_speed_cap_mps: float | None = None
+        startup_elapsed_s = max(0, sensors.tick) * _clamp(_finite_or(sensors.dt_s), 0.0, 0.25)
+        if (
+            self.parameters.startup_speed_cap_mps > 0.0
+            and self.parameters.startup_speed_cap_seconds > 0.0
+            and startup_elapsed_s < self.parameters.startup_speed_cap_seconds
+        ):
+            startup_speed_cap_mps = self.parameters.startup_speed_cap_mps
+
+        racing_steer, curvature, steering_diagnostics = self._preview_steer(features, sensors.dt_s)
         if self.state.mode is ControlMode.RECOVER:
             desired_steer = self.state.recovery_steer
             throttle = self.parameters.recovery_reverse_throttle
             target_speed_mps = 0.0
         elif self.state.mode is ControlMode.AVOID:
             desired_steer = self._avoidance_steer(features, racing_steer)
-            throttle, target_speed_mps = self._speed_command(features, curvature, desired_steer, avoiding=True)
+            throttle, target_speed_mps = self._speed_command(
+                features,
+                curvature,
+                desired_steer,
+                avoiding=True,
+                startup_speed_cap_mps=startup_speed_cap_mps,
+            )
         else:
             desired_steer = racing_steer
-            throttle, target_speed_mps = self._speed_command(features, curvature, desired_steer, avoiding=False)
+            throttle, target_speed_mps = self._speed_command(
+                features,
+                curvature,
+                desired_steer,
+                avoiding=False,
+                startup_speed_cap_mps=startup_speed_cap_mps,
+            )
 
         steer_slew = (
             self.parameters.steer_slew_per_tick
@@ -304,6 +374,7 @@ class PreviewController:
     def _preview_steer(
         self,
         features: PreviewFeatures,
+        dt_s: float,
     ) -> tuple[
         float,
         float,
@@ -344,7 +415,7 @@ class PreviewController:
             1.0,
         )
         if parameters.pose_invariant_racing_line:
-            line_target = self._tracked_line_target(features, line_shape)
+            line_target = self._tracked_line_target(features, line_shape, dt_s)
         else:
             line_target = self._racing_line_offset(features, curvature, curve_direction)
 
@@ -390,10 +461,23 @@ class PreviewController:
             diagnostics,
         )
 
-    def _tracked_line_target(self, features: PreviewFeatures, shape: tuple[float, float]) -> float:
+    def _tracked_line_target(
+        self,
+        features: PreviewFeatures,
+        shape: tuple[float, float],
+        dt_s: float,
+    ) -> float:
         parameters = self.parameters
         raw_target = self._line_target(shape)
-        target = _slew(self.state.line_target, raw_target, parameters.line_target_slew_per_tick)
+        self._update_sweeper_speed_state(shape, dt_s)
+        self._update_sweeper_preview_speed_state(shape, dt_s)
+        self._update_corner_exit_speed_state(shape)
+        previous_target = self.state.line_target
+        if parameters.initialize_line_target_from_preview and not self.state.line_target_initialized:
+            target = raw_target
+        else:
+            target = _slew(previous_target, raw_target, self._line_target_rate(previous_target, raw_target))
+        self.state.line_target_initialized = True
         if parameters.line_clearance_m > 0.0 and target != 0.0:
             toward = features.wall_right if target > 0.0 else features.wall_left
             clearance_m = toward * parameters.lidar_cap_m
@@ -401,6 +485,114 @@ class PreviewController:
                 target *= _unit_interval(clearance_m / parameters.line_clearance_m)
         self.state.line_target = target
         return target
+
+    def _update_sweeper_speed_state(
+        self,
+        shape: tuple[float, float],
+        dt_s: float,
+    ) -> None:
+        """Arm the local speed bonus after a sustained broad turn."""
+        parameters = self.parameters
+        if (
+            parameters.sweeper_target_speed_bonus_mps <= 0.0
+            or parameters.sweeper_minimum_duration_s <= 0.0
+            or parameters.sweeper_speed_hold_seconds <= 0.0
+        ):
+            return
+
+        state = self.state
+        step_seconds = _clamp(_finite_or(dt_s, 1.0 / 60.0), 0.0, 0.25)
+        direction_signal = shape[0] + shape[1]
+        direction = _sign(direction_signal) if abs(direction_signal) >= SWEEPER_ACTIVE_CURVATURE else 0.0
+
+        if direction != 0.0:
+            if direction == state.sweeper_turn_direction:
+                state.sweeper_turn_seconds += step_seconds
+            else:
+                state.sweeper_turn_direction = direction
+                state.sweeper_turn_seconds = step_seconds
+
+            if direction != state.sweeper_speed_hold_direction and state.sweeper_speed_hold_seconds > 0.0:
+                state.sweeper_speed_hold_seconds = 0.0
+                state.sweeper_speed_hold_direction = 0.0
+
+            if state.sweeper_turn_seconds >= parameters.sweeper_minimum_duration_s:
+                state.sweeper_speed_hold_direction = direction
+                state.sweeper_speed_hold_seconds = parameters.sweeper_speed_hold_seconds
+        else:
+            state.sweeper_turn_direction = 0.0
+            state.sweeper_turn_seconds = 0.0
+
+        state.sweeper_speed_hold_seconds = max(0.0, state.sweeper_speed_hold_seconds - step_seconds)
+
+    def _update_sweeper_preview_speed_state(
+        self,
+        shape: tuple[float, float],
+        dt_s: float,
+    ) -> None:
+        """Arm a speed bonus from the distinctive entry of a broad sweeper."""
+        parameters = self.parameters
+        if (
+            parameters.sweeper_preview_minimum_far_curvature <= 0.0
+            or parameters.sweeper_preview_maximum_far_curvature <= 0.0
+            or parameters.sweeper_preview_speed_hold_seconds <= 0.0
+            or parameters.sweeper_preview_target_speed_bonus_mps <= 0.0
+        ):
+            return
+
+        state = self.state
+        step_seconds = _clamp(_finite_or(dt_s, 1.0 / 60.0), 0.0, 0.25)
+        near_turn, far_turn = shape
+        direction_signal = near_turn + far_turn
+        direction = _sign(direction_signal) if abs(direction_signal) >= SWEEPER_ACTIVE_CURVATURE else 0.0
+        if (
+            direction != 0.0
+            and state.sweeper_preview_hold_direction != 0.0
+            and direction != state.sweeper_preview_hold_direction
+        ):
+            state.sweeper_preview_speed_hold_seconds = 0.0
+            state.sweeper_preview_hold_direction = 0.0
+
+        far_magnitude = abs(far_turn)
+        preview_entry = (
+            near_turn * far_turn < 0.0
+            and far_magnitude > abs(near_turn)
+            and parameters.sweeper_preview_minimum_far_curvature
+            <= far_magnitude
+            <= parameters.sweeper_preview_maximum_far_curvature
+        )
+        if preview_entry:
+            state.sweeper_preview_hold_direction = _sign(far_turn)
+            state.sweeper_preview_speed_hold_seconds = parameters.sweeper_preview_speed_hold_seconds
+        else:
+            state.sweeper_preview_speed_hold_seconds = max(
+                0.0,
+                state.sweeper_preview_speed_hold_seconds - step_seconds,
+            )
+            if state.sweeper_preview_speed_hold_seconds == 0.0:
+                state.sweeper_preview_hold_direction = 0.0
+
+    def _update_corner_exit_speed_state(self, shape: tuple[float, float]) -> None:
+        """Track how strongly the local preview indicates a corner exit."""
+        if self.parameters.corner_exit_target_speed_bonus_mps <= 0.0:
+            self.state.corner_exit_speed_bonus_factor = 0.0
+            return
+        near_turn, far_turn = shape
+        dominant = max(abs(near_turn), abs(far_turn))
+        if dominant <= 1e-6:
+            self.state.corner_exit_speed_bonus_factor = 0.0
+            return
+        phase_difference = (abs(far_turn) - abs(near_turn)) / dominant
+        self.state.corner_exit_speed_bonus_factor = _unit_interval(-phase_difference / LINE_PHASE_TRANSITION_RATIO)
+
+    def _line_target_rate(self, previous_target: float, raw_target: float) -> float:
+        """Pick the outward or the release rate for this tick's target move."""
+        parameters = self.parameters
+        release = parameters.line_target_release_per_tick
+        if release is None:
+            return parameters.line_target_slew_per_tick
+        relaxing_on_the_same_side = abs(raw_target) < abs(previous_target) and raw_target * previous_target >= 0.0
+        return release if relaxing_on_the_same_side else parameters.line_target_slew_per_tick
 
     def _line_target(self, shape: tuple[float, float]) -> float:
         parameters = self.parameters
@@ -513,12 +705,23 @@ class PreviewController:
         steer: float,
         *,
         avoiding: bool,
+        startup_speed_cap_mps: float | None,
     ) -> tuple[float, float]:
         parameters = self.parameters
         target_speed = (
             parameters.straight_target_speed_mps
             + (parameters.corner_target_speed_mps - parameters.straight_target_speed_mps) * curvature
         )
+        speed_bonus = 0.0
+        if self.state.sweeper_speed_hold_seconds > 0.0:
+            speed_bonus = max(speed_bonus, parameters.sweeper_target_speed_bonus_mps)
+        if self.state.sweeper_preview_speed_hold_seconds > 0.0:
+            speed_bonus = max(speed_bonus, parameters.sweeper_preview_target_speed_bonus_mps)
+        speed_bonus = max(
+            speed_bonus,
+            parameters.corner_exit_target_speed_bonus_mps * self.state.corner_exit_speed_bonus_factor,
+        )
+        target_speed += max(0.0, speed_bonus)
         target_speed *= 1.0 - parameters.steering_speed_reduction * abs(steer)
         target_speed *= 1.0 - parameters.yaw_speed_reduction * abs(features.yaw_rate)
 
@@ -546,6 +749,8 @@ class PreviewController:
 
         if avoiding:
             target_speed = min(target_speed, parameters.avoid_speed_mps)
+        if startup_speed_cap_mps is not None:
+            target_speed = min(target_speed, startup_speed_cap_mps)
 
         speed_error = target_speed - features.speed_mps
         if speed_error >= 0.0:

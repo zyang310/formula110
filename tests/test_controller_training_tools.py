@@ -320,6 +320,8 @@ def _improved_trial(
     damage: float = 0.0,
     wall_contact_seconds: float = 0.0,
     lap_count: int = 1,
+    best_lap_time_seconds: float = 20.0,
+    first_lap_time_seconds: float | None = None,
 ) -> Any:
     return evaluator.SoloTrialResult(
         seed=1,
@@ -331,8 +333,8 @@ def _improved_trial(
         survived=True,
         wall_contact_seconds=wall_contact_seconds,
         max_speed_mps=20.0,
-        first_lap_time_seconds=20.0,
-        best_lap_time_seconds=20.0,
+        first_lap_time_seconds=(best_lap_time_seconds if first_lap_time_seconds is None else first_lap_time_seconds),
+        best_lap_time_seconds=best_lap_time_seconds,
     )
 
 
@@ -373,6 +375,221 @@ def test_improved_score_ranks_lap_completion_above_the_incident_budget() -> None
     assert search.improved_score((lapped_with_incident,), baseline_distances) > search.improved_score(
         (clean_without_a_lap,), baseline_distances
     )
+
+
+def test_lap_time_score_is_robust_and_keeps_the_hard_safety_tiers() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    clean_fast = _improved_trial(
+        evaluator,
+        raw_distance_m=650.0,
+        best_lap_time_seconds=7.80,
+    )
+    clean_slow = _improved_trial(
+        evaluator,
+        raw_distance_m=680.0,
+        best_lap_time_seconds=7.95,
+    )
+    unsafe_fast = _improved_trial(
+        evaluator,
+        raw_distance_m=700.0,
+        damage=0.30,
+        best_lap_time_seconds=7.60,
+    )
+    fast_but_variable = (
+        _improved_trial(evaluator, raw_distance_m=680.0, best_lap_time_seconds=7.70),
+        _improved_trial(evaluator, raw_distance_m=680.0, best_lap_time_seconds=8.10),
+    )
+    consistently_fast = (
+        _improved_trial(evaluator, raw_distance_m=670.0, best_lap_time_seconds=7.90),
+        _improved_trial(evaluator, raw_distance_m=670.0, best_lap_time_seconds=7.90),
+    )
+
+    assert search.lap_time_score((clean_fast,), {}) > search.lap_time_score((clean_slow,), {})
+    assert search.lap_time_score((clean_slow,), {}) > search.lap_time_score((unsafe_fast,), {})
+    assert search.lap_time_score(consistently_fast, {}) > search.lap_time_score(fast_but_variable, {})
+
+
+def test_lap_time_score_v2_ignores_float_jitter_before_ranking_distribution() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    jitter_winner = (
+        _improved_trial(evaluator, raw_distance_m=680.0, best_lap_time_seconds=7.833333333332888),
+        _improved_trial(evaluator, raw_distance_m=680.0, best_lap_time_seconds=7.833333333332888),
+    )
+    meaningful_winner = (
+        _improved_trial(evaluator, raw_distance_m=680.0, best_lap_time_seconds=7.833333333333670),
+        _improved_trial(evaluator, raw_distance_m=680.0, best_lap_time_seconds=7.816666666666222),
+    )
+
+    assert search.lap_time_score(jitter_winner, {}) > search.lap_time_score(meaningful_winner, {})
+    assert search.lap_time_score_v2(meaningful_winner, {}) > search.lap_time_score_v2(jitter_winner, {})
+
+
+def test_lap_time_score_v3_requires_three_laps_and_clean_trials_before_speed() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    clean_slow = _improved_trial(
+        evaluator,
+        raw_distance_m=680.0,
+        lap_count=3,
+        best_lap_time_seconds=7.90,
+    )
+    incident_fast = _improved_trial(
+        evaluator,
+        raw_distance_m=690.0,
+        damage=0.02,
+        wall_contact_seconds=0.15,
+        lap_count=3,
+        best_lap_time_seconds=7.70,
+    )
+    two_lap_fast = _improved_trial(
+        evaluator,
+        raw_distance_m=500.0,
+        lap_count=2,
+        best_lap_time_seconds=7.60,
+    )
+
+    assert search.lap_time_score_v3((clean_slow,), {}) > search.lap_time_score_v3((incident_fast,), {})
+    assert search.lap_time_score_v3((incident_fast,), {}) > search.lap_time_score_v3((two_lap_fast,), {})
+
+
+def test_lap_time_score_v4_uses_first_lap_after_repeated_lap_pace() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    clean_start = _improved_trial(
+        evaluator,
+        raw_distance_m=680.0,
+        lap_count=3,
+        best_lap_time_seconds=7.80,
+        first_lap_time_seconds=8.70,
+    )
+    correction_start = _improved_trial(
+        evaluator,
+        raw_distance_m=680.0,
+        lap_count=3,
+        best_lap_time_seconds=7.80,
+        first_lap_time_seconds=9.95,
+    )
+    slower_repeated_lap = _improved_trial(
+        evaluator,
+        raw_distance_m=690.0,
+        lap_count=3,
+        best_lap_time_seconds=7.82,
+        first_lap_time_seconds=8.60,
+    )
+
+    assert search.lap_time_score_v4((clean_start,), {}) > search.lap_time_score_v4((correction_start,), {})
+    assert search.lap_time_score_v4((clean_start,), {}) > search.lap_time_score_v4((slower_repeated_lap,), {})
+
+
+def test_lap_time_score_v5_rejects_a_tiny_repeated_gain_with_a_slow_launch() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    balanced = _improved_trial(
+        evaluator,
+        raw_distance_m=684.0,
+        lap_count=3,
+        best_lap_time_seconds=7.80,
+        first_lap_time_seconds=8.90,
+    )
+    slow_launch = _improved_trial(
+        evaluator,
+        raw_distance_m=674.0,
+        lap_count=3,
+        best_lap_time_seconds=7.77,
+        first_lap_time_seconds=10.20,
+    )
+
+    assert search.lap_time_score_v4((slow_launch,), {}) > search.lap_time_score_v4((balanced,), {})
+    assert search.lap_time_score_v5((balanced,), {}) > search.lap_time_score_v5((slow_launch,), {})
+
+
+def test_lap_time_score_v6_ties_equal_physical_totals_in_integer_ticks() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    parent = _improved_trial(
+        evaluator,
+        raw_distance_m=684.0,
+        lap_count=3,
+        best_lap_time_seconds=466 / 60,
+        first_lap_time_seconds=535 / 60,
+    )
+    decimal_artifact = _improved_trial(
+        evaluator,
+        raw_distance_m=681.0,
+        lap_count=3,
+        best_lap_time_seconds=470 / 60,
+        first_lap_time_seconds=527 / 60,
+    )
+
+    # Both totals are exactly 1,467 simulator ticks. Six-decimal component
+    # rounding reverses them; integer-tick ranking ties the total and then keeps
+    # the parent's faster repeated lap.
+    assert search.lap_time_score_v5((decimal_artifact,), {}) > search.lap_time_score_v5((parent,), {})
+    parent_score = search.lap_time_score_v6((parent,), {})
+    artifact_score = search.lap_time_score_v6((decimal_artifact,), {})
+    assert parent_score[5] == artifact_score[5] == -1467.0
+    assert parent_score > artifact_score
+
+
+def test_lap_time_score_v7_weights_first_and_best_laps_equally() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    faster_best = _improved_trial(
+        evaluator,
+        raw_distance_m=690.0,
+        lap_count=3,
+        best_lap_time_seconds=450 / 60,
+        first_lap_time_seconds=600 / 60,
+    )
+    balanced = _improved_trial(
+        evaluator,
+        raw_distance_m=680.0,
+        lap_count=3,
+        best_lap_time_seconds=465 / 60,
+        first_lap_time_seconds=570 / 60,
+    )
+
+    # Both candidates tie at 1,500 ticks under first + 2*best.  Equal weighting
+    # prefers the balanced candidate's 1,035 ticks over 1,050.
+    assert search.lap_time_score_v6((faster_best,), {}) > search.lap_time_score_v6((balanced,), {})
+    assert search.lap_time_score_v7((balanced,), {}) > search.lap_time_score_v7((faster_best,), {})
+
+
+def test_lap_time_score_v8_refuses_to_trade_best_lap_for_first_lap() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    # The exact pair v21 generation 11 chose between: 513 + 457 and 512 + 458
+    # are both 970 ticks, so v7's sum key ties and its next key, first lap,
+    # picked the candidate whose best lap is a tick slower.
+    incumbent = _improved_trial(
+        evaluator,
+        raw_distance_m=700.0,
+        lap_count=3,
+        best_lap_time_seconds=457 / 60,
+        first_lap_time_seconds=513 / 60,
+    )
+    first_lap_trade = _improved_trial(
+        evaluator,
+        raw_distance_m=700.0,
+        lap_count=3,
+        best_lap_time_seconds=458 / 60,
+        first_lap_time_seconds=512 / 60,
+    )
+
+    assert search.lap_time_score_v7((first_lap_trade,), {}) > search.lap_time_score_v7((incumbent,), {})
+    assert search.lap_time_score_v8((incumbent,), {}) > search.lap_time_score_v8((first_lap_trade,), {})
+
+    # With best lap held equal, v8 still takes the faster first lap.
+    faster_first = _improved_trial(
+        evaluator,
+        raw_distance_m=700.0,
+        lap_count=3,
+        best_lap_time_seconds=457 / 60,
+        first_lap_time_seconds=512 / 60,
+    )
+    assert search.lap_time_score_v8((faster_first,), {}) > search.lap_time_score_v8((incumbent,), {})
 
 
 def test_faster_line_preset_is_isolated_and_uses_planned_bounds() -> None:
@@ -466,6 +683,36 @@ def test_faster_line_v2_ga_is_seeded_from_the_probe_winner(tmp_path: Path) -> No
     assert initial["curvature_lateral_ratio"] == 0.77
     assert base.preview_line_compensation == 0.83
     assert base.wall_balance_line_compensation == 0.79
+
+
+def test_seed_checkpoint_applies_fixed_context_and_searched_vector(tmp_path: Path) -> None:
+    search = load_tool("search")
+    checkpoint = tmp_path / "parent.json"
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "best_parameter_vector": {
+                    "startup_speed_cap_mps": 20.25,
+                    "startup_speed_cap_seconds": 2.90,
+                },
+                "checkpoint_context": {
+                    "straight_target_speed_mps": 25.075,
+                    "front_brake_start_m": 11.919,
+                    "line_target_slew_per_tick": 0.02765,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    base, space = search.preset_configuration("faster-line-v12", seed_checkpoint=checkpoint)
+    initial = dict(zip(space.names, space.initial_mean, strict=True))
+
+    assert base.straight_target_speed_mps == 25.075
+    assert base.front_brake_start_m == 11.919
+    assert base.line_target_slew_per_tick == 0.02765
+    assert initial["startup_speed_cap_mps"] == 20.25
+    assert initial["startup_speed_cap_seconds"] == 2.90
 
 
 def test_improved_score_v2_keeps_three_hard_tiers_and_one_robust_distance() -> None:
@@ -669,3 +916,554 @@ def test_faster_line_v3_unpins_the_v2_bounds_and_stays_inside_the_barrier() -> N
     assert body_edge_m < 4.7 - 0.9, body_edge_m
     for ratio in ("racing_line_offset_ratio", "racing_line_entry_offset_ratio", "racing_line_exit_offset_ratio"):
         assert bounds[ratio][1] >= bounds["maximum_racing_line_offset_ratio"][1]
+
+
+def test_faster_line_v4_raises_the_v3_ceilings_and_adds_target_release() -> None:
+    search = load_tool("search")
+
+    base, space = search.preset_configuration("faster-line-v4")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    initial = {spec.name: spec.initial for spec in space.specs}
+
+    assert len(space.specs) == 17
+    assert base.pose_invariant_racing_line
+    assert base.pose_invariant_speed_curvature
+    # Generation 0 must reproduce v3: the release rate starts at the outward slew.
+    assert initial["line_target_release_per_tick"] == initial["line_target_slew_per_tick"]
+    assert bounds["line_target_release_per_tick"][0] < 0.005
+
+    # Every ceiling v3 pinned against must have moved up, and every floor down.
+    assert bounds["throttle_gain"][1] > 2.00
+    assert bounds["curvature_lateral_ratio"][1] > 0.30
+    assert bounds["maximum_racing_line_offset_ratio"][1] > 0.90
+    assert bounds["racing_line_offset_ratio"][1] > 0.90
+    assert bounds["racing_line_entry_offset_ratio"][1] > 0.90
+    assert bounds["heading_steer_gain"][0] < 0.40
+
+    # Half-track 3.3 m, hull half-width 0.63 m, barrier inner face 4.7 m, so the
+    # body edge reaches the barrier near 4.07 m of offset. Keep real margin.
+    body_edge_m = bounds["maximum_racing_line_offset_ratio"][1] * 3.3 + 0.63
+    assert body_edge_m < 4.07 - 0.25, body_edge_m
+    for ratio in ("racing_line_offset_ratio", "racing_line_entry_offset_ratio", "racing_line_exit_offset_ratio"):
+        assert bounds[ratio][1] >= bounds["maximum_racing_line_offset_ratio"][1]
+
+
+def test_faster_line_v5_restores_wall_margin_and_holds_the_line_clamp() -> None:
+    search = load_tool("search")
+
+    _base, space = search.preset_configuration("faster-line-v5")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+
+    assert len(space.specs) == 17
+    # A seed-110 sweep showed a high retraction threshold oscillates the target
+    # rather than protecting it: at 2.0 the trial collapses to 234 m with 728
+    # AVOID ticks. The search must stay free to pick a low value.
+    assert bounds["line_clearance_m"][0] == 0.0
+
+    # The line clamp deliberately keeps v4's ceiling. v4 reached 3.77 m of
+    # offset, putting the body edge at 4.40 m against a barrier at 4.70 m, so
+    # widening further buys contact rather than lap time.
+    assert bounds["maximum_racing_line_offset_ratio"][1] == 0.95
+    for ratio in ("racing_line_offset_ratio", "racing_line_entry_offset_ratio", "racing_line_exit_offset_ratio"):
+        assert bounds[ratio][1] == 0.95
+
+    # The genes v4 pinned that are not wall-safety limits do get more room.
+    assert bounds["curvature_lateral_ratio"][1] > 0.60
+    assert bounds["heading_steer_gain"][0] < 0.15
+    assert bounds["throttle_gain"][1] > 4.00
+
+
+def test_faster_line_v6_adds_structural_variation_without_widening_the_line_clamp() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+
+    base, space = search.preset_configuration("faster-line-v6")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    initial = {spec.name: spec.initial for spec in space.specs}
+
+    assert len(space.specs) == 20
+    assert base.pose_invariant_racing_line
+    assert base.pose_invariant_speed_curvature
+    assert base.maximum_racing_line_offset_ratio == 0.95
+    assert "maximum_racing_line_offset_ratio" not in space.names
+
+    # V6 changes the available behaviours instead of only inflating mutation.
+    for name in (
+        "yaw_damping_gain",
+        "steer_slew_per_tick",
+        "curvature_heading_degrees",
+        "yaw_speed_reduction",
+    ):
+        assert name in space.names
+        spec = next(spec for spec in space.specs if spec.name == name)
+        assert initial[name] == spec.clamp(getattr(base, name))
+
+    # Reopen only the non-geometric bounds that the v5 winner pressed.
+    assert bounds["curvature_lateral_ratio"][1] > 1.20
+    assert bounds["heading_steer_gain"][0] < 0.05
+    assert bounds["line_turn_sensitivity"][0] < 0.002
+    assert bounds["line_target_release_per_tick"][1] > 0.25
+    assert bounds["line_clearance_m"][0] == 0.0
+    for ratio in ("racing_line_offset_ratio", "racing_line_entry_offset_ratio", "racing_line_exit_offset_ratio"):
+        assert bounds[ratio][1] == base.maximum_racing_line_offset_ratio
+
+    # Searched steering dynamics must not also be frozen into GA checkpoint
+    # context; bake still carries the two fixed line-frame compensations.
+    assert search._checkpoint_context("faster-line-v6", base) == {
+        "preview_line_compensation": base.preview_line_compensation,
+        "wall_balance_line_compensation": base.wall_balance_line_compensation,
+    }
+    assert search.parse_args(["faster-line-v6"]).preset == "faster-line-v6"
+    assert bake.parse_args(["--preset", "faster-line-v6"]).preset == "faster-line-v6"
+
+
+def test_faster_line_v7_targets_the_measured_wall_speed_bottleneck() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+
+    base, space = search.preset_configuration("faster-line-v7")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+
+    assert len(space.specs) == 16
+    assert base.pose_invariant_racing_line
+    assert base.pose_invariant_speed_curvature
+    assert base.maximum_racing_line_offset_ratio == 0.95
+    for name in (
+        "side_slow_start_m",
+        "side_speed_floor",
+        "avoid_front_wall_m",
+        "avoid_diagonal_wall_m",
+        "avoid_side_wall_m",
+        "avoid_speed_mps",
+        "avoid_steer_gain",
+    ):
+        assert name in space.names
+    for name in (
+        "heading_steer_gain",
+        "center_steer_gain",
+        "yaw_damping_gain",
+        "steer_slew_per_tick",
+        "racing_line_offset_ratio",
+        "line_target_slew_per_tick",
+    ):
+        assert name not in space.names
+
+    # The clean diagnostic values are admitted, while the failed side-speed
+    # floor of 0.8 is deliberately outside the box.
+    assert bounds["avoid_front_wall_m"][0] <= 2.5
+    assert bounds["avoid_diagonal_wall_m"][0] <= 1.2
+    assert bounds["avoid_side_wall_m"][0] <= 0.7
+    assert bounds["avoid_speed_mps"][1] >= 8.0
+    assert bounds["side_speed_floor"][1] < 0.8
+    assert not set(search._checkpoint_context("faster-line-v7", base)) & set(space.names)
+
+    args = search.parse_args(["faster-line-v7", "--objective", "lap-time"])
+    assert args.preset == "faster-line-v7"
+    assert args.objective == "lap-time"
+    assert bake.parse_args(["--preset", "faster-line-v7"]).preset == "faster-line-v7"
+
+
+def test_faster_line_v8_moves_v7s_pressed_bounds_and_drops_zeroed_speed_genes() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+
+    base, space = search.preset_configuration("faster-line-v8")
+    v7_base, v7_space = search.preset_configuration("faster-line-v7")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    v7_bounds = {spec.name: (spec.minimum, spec.maximum) for spec in v7_space.specs}
+
+    assert len(space.specs) == 14
+    assert base.maximum_racing_line_offset_ratio == 0.95
+    assert "steering_speed_reduction" not in space.names
+    assert "yaw_speed_reduction" not in space.names
+    assert bounds["throttle_gain"][1] > v7_bounds["throttle_gain"][1]
+    assert bounds["curvature_lateral_ratio"][1] > v7_bounds["curvature_lateral_ratio"][1]
+    assert bounds["avoid_diagonal_wall_m"][0] < v7_bounds["avoid_diagonal_wall_m"][0]
+    assert bounds["avoid_side_wall_m"][0] < v7_bounds["avoid_side_wall_m"][0]
+    assert search._checkpoint_context("faster-line-v8", base)["steering_speed_reduction"] == (
+        v7_base.steering_speed_reduction
+    )
+
+    args = search.parse_args(["faster-line-v8", "--objective", "lap-time-v2"])
+    assert args.preset == "faster-line-v8"
+    assert args.objective == "lap-time-v2"
+    assert bake.parse_args(["--preset", "faster-line-v8"]).preset == "faster-line-v8"
+
+
+def test_faster_line_v9_restores_a_safe_side_threshold_and_consistency_objective() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+
+    base, space = search.preset_configuration("faster-line-v9")
+    v8_base, v8_space = search.preset_configuration("faster-line-v8")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    v8_bounds = {spec.name: (spec.minimum, spec.maximum) for spec in v8_space.specs}
+
+    assert len(space.specs) == 14
+    assert base.maximum_racing_line_offset_ratio == 0.95
+    assert bounds["avoid_side_wall_m"][0] > v8_bounds["avoid_side_wall_m"][0]
+    assert bounds["throttle_gain"][1] > v8_bounds["throttle_gain"][1]
+    assert not set(search._checkpoint_context("faster-line-v9", base)) & set(space.names)
+    assert search._checkpoint_context("faster-line-v9", base)["steering_speed_reduction"] == (
+        v8_base.steering_speed_reduction
+    )
+
+    args = search.parse_args(["faster-line-v9", "--objective", "lap-time-v3"])
+    assert args.preset == "faster-line-v9"
+    assert args.objective == "lap-time-v3"
+    assert bake.parse_args(["--preset", "faster-line-v9"]).preset == "faster-line-v9"
+
+
+def test_faster_line_v10_searches_the_clean_first_corner_and_official_seeds() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v10")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    manifest = seeds.generate_seed_manifest()
+
+    assert len(space.specs) == 16
+    assert base.startup_speed_cap_mps == 19.0
+    assert base.startup_speed_cap_seconds == 3.5
+    assert bounds["startup_speed_cap_mps"] == (16.0, 24.0)
+    assert bounds["startup_speed_cap_seconds"] == (2.5, 5.0)
+    assert "steering_speed_reduction" in space.names
+    assert "yaw_damping_gain" in space.names
+    assert "line_target_slew_per_tick" not in space.names
+    context = search._checkpoint_context("faster-line-v10", base)
+    assert not set(context) & set(space.names)
+    assert context["straight_target_speed_mps"] == base.straight_target_speed_mps
+    assert context["front_brake_start_m"] == base.front_brake_start_m
+
+    assert search._full_evaluation_seeds("faster-line-v10", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v10", manifest, 0)[-2:] == manifest.official
+    assert search._full_evaluation_seeds("faster-line-v9", manifest) == manifest.training
+
+    args = search.parse_args(["faster-line-v10", "--objective", "lap-time-v4"])
+    assert args.preset == "faster-line-v10"
+    assert args.objective == "lap-time-v4"
+    assert bake.parse_args(["--preset", "faster-line-v10"]).preset == "faster-line-v10"
+
+
+def test_faster_line_v11_keeps_v10s_box_but_ranks_total_race_time() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v11")
+    v10_base, v10_space = search.preset_configuration("faster-line-v10")
+    manifest = seeds.generate_seed_manifest()
+
+    assert base == v10_base
+    assert space == v10_space
+    assert search._full_evaluation_seeds("faster-line-v11", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v11", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v11", "--objective", "lap-time-v5"])
+    assert args.preset == "faster-line-v11"
+    assert args.objective == "lap-time-v5"
+    assert bake.parse_args(["--preset", "faster-line-v11"]).preset == "faster-line-v11"
+
+
+def test_faster_line_v12_keeps_the_box_and_uses_tick_ranking() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v12")
+    v11_base, v11_space = search.preset_configuration("faster-line-v11")
+    manifest = seeds.generate_seed_manifest()
+
+    assert base == v11_base
+    assert space == v11_space
+    assert search._full_evaluation_seeds("faster-line-v12", manifest) == manifest.training + manifest.official
+    args = search.parse_args(["faster-line-v12", "--objective", "lap-time-v6"])
+    assert args.preset == "faster-line-v12"
+    assert args.objective == "lap-time-v6"
+    assert bake.parse_args(["--preset", "faster-line-v12"]).preset == "faster-line-v12"
+
+
+def test_faster_line_v13_keeps_tick_ranking_after_context_seed_fix() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v13")
+    v12_base, v12_space = search.preset_configuration("faster-line-v12")
+    manifest = seeds.generate_seed_manifest()
+
+    assert base == v12_base
+    assert space == v12_space
+    assert search._full_evaluation_seeds("faster-line-v13", manifest) == manifest.training + manifest.official
+    args = search.parse_args(["faster-line-v13", "--objective", "lap-time-v6"])
+    assert args.preset == "faster-line-v13"
+    assert args.objective == "lap-time-v6"
+    assert bake.parse_args(["--preset", "faster-line-v13"]).preset == "faster-line-v13"
+
+
+def test_faster_line_v14_targets_only_the_validated_sweeper_speed_bonus() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v14")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == (
+        "sweeper_minimum_duration_s",
+        "sweeper_speed_hold_seconds",
+        "sweeper_target_speed_bonus_mps",
+    )
+    assert base.sweeper_minimum_duration_s == 1.7
+    assert base.sweeper_speed_hold_seconds == 0.9
+    assert base.sweeper_target_speed_bonus_mps == 1.5
+    assert bounds["sweeper_minimum_duration_s"] == (1.25, 2.20)
+    assert bounds["sweeper_speed_hold_seconds"] == (0.15, 1.20)
+    assert bounds["sweeper_target_speed_bonus_mps"] == (0.10, 3.00)
+    assert not set(search._checkpoint_context("faster-line-v14", base)) & set(space.names)
+    assert search._full_evaluation_seeds("faster-line-v14", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v14", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v14", "--objective", "lap-time-v6"])
+    assert args.preset == "faster-line-v14"
+    assert args.objective == "lap-time-v6"
+    assert bake.parse_args(["--preset", "faster-line-v14"]).preset == "faster-line-v14"
+
+
+def test_faster_line_v15_targets_the_previewed_sweeper_entry() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v15")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == (
+        "sweeper_preview_minimum_far_curvature",
+        "sweeper_preview_maximum_far_curvature",
+        "sweeper_preview_speed_hold_seconds",
+        "sweeper_preview_target_speed_bonus_mps",
+    )
+    assert base.sweeper_preview_minimum_far_curvature == 0.10
+    assert base.sweeper_preview_maximum_far_curvature == 0.14
+    assert base.sweeper_preview_speed_hold_seconds == 2.30
+    assert base.sweeper_preview_target_speed_bonus_mps == 0.0
+    assert bounds["sweeper_preview_minimum_far_curvature"] == (0.07, 0.13)
+    assert bounds["sweeper_preview_maximum_far_curvature"] == (0.11, 0.18)
+    assert bounds["sweeper_preview_speed_hold_seconds"] == (0.50, 3.00)
+    assert bounds["sweeper_preview_target_speed_bonus_mps"] == (0.0, 4.0)
+    assert not set(search._checkpoint_context("faster-line-v15", base)) & set(space.names)
+    assert search._full_evaluation_seeds("faster-line-v15", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v15", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v15", "--objective", "lap-time-v6"])
+    assert args.preset == "faster-line-v15"
+    assert args.objective == "lap-time-v6"
+    assert bake.parse_args(["--preset", "faster-line-v15"]).preset == "faster-line-v15"
+
+
+def test_faster_line_v16_reopens_the_launch_duration_floor() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v16")
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == ("startup_speed_cap_mps", "startup_speed_cap_seconds")
+    assert bounds["startup_speed_cap_mps"] == (21.5, 22.9)
+    assert bounds["startup_speed_cap_seconds"] == (1.85, 2.50)
+    assert not set(search._checkpoint_context("faster-line-v16", base)) & set(space.names)
+    assert search._full_evaluation_seeds("faster-line-v16", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v16", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v16", "--objective", "lap-time-v6"])
+    assert args.preset == "faster-line-v16"
+    assert args.objective == "lap-time-v6"
+    assert bake.parse_args(["--preset", "faster-line-v16"]).preset == "faster-line-v16"
+
+
+def test_faster_line_v17_jointly_tunes_launch_and_preview_under_equal_lap_weight() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v17")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == (
+        "sweeper_preview_minimum_far_curvature",
+        "sweeper_preview_maximum_far_curvature",
+        "sweeper_preview_speed_hold_seconds",
+        "sweeper_preview_target_speed_bonus_mps",
+        "startup_speed_cap_mps",
+        "startup_speed_cap_seconds",
+    )
+    assert not set(search._checkpoint_context("faster-line-v17", base)) & set(space.names)
+    assert search._full_evaluation_seeds("faster-line-v17", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v17", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v17", "--objective", "lap-time-v7"])
+    assert args.preset == "faster-line-v17"
+    assert args.objective == "lap-time-v7"
+    assert bake.parse_args(["--preset", "faster-line-v17"]).preset == "faster-line-v17"
+
+
+def test_faster_line_v18_targets_only_the_corner_exit_bonus() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v18")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == ("corner_exit_target_speed_bonus_mps",)
+    assert base.corner_exit_target_speed_bonus_mps == 0.0
+    assert not set(search._checkpoint_context("faster-line-v18", base)) & set(space.names)
+    assert search._full_evaluation_seeds("faster-line-v18", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v18", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v18", "--objective", "lap-time-v7"])
+    assert args.preset == "faster-line-v18"
+    assert args.objective == "lap-time-v7"
+    assert bake.parse_args(["--preset", "faster-line-v18"]).preset == "faster-line-v18"
+
+
+def test_faster_line_v19_reopens_the_two_pinned_bounds() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v19")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == ("corner_target_speed_mps", "front_stop_m")
+    # V13's elites pinned both genes exactly on the bound v10 gave them; the new
+    # box must actually clear those edges or the reopening is a no-op.
+    corner, front = space.specs
+    assert corner.minimum < 14.0
+    assert front.maximum > 1.60
+    assert not set(search._checkpoint_context("faster-line-v19", base)) & set(space.names)
+    # The v18 lever stays fixed rather than silently reverting to its default.
+    assert "corner_exit_target_speed_bonus_mps" in search._checkpoint_context("faster-line-v19", base)
+    assert search._full_evaluation_seeds("faster-line-v19", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v19", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v19", "--objective", "lap-time-v7"])
+    assert args.preset == "faster-line-v19"
+    assert args.objective == "lap-time-v7"
+    assert bake.parse_args(["--preset", "faster-line-v19"]).preset == "faster-line-v19"
+
+
+def test_faster_line_v20_reopens_the_launch_box_on_both_sides() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v20")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == ("startup_speed_cap_mps", "startup_speed_cap_seconds")
+    # V16's box was 21.5-22.9 m/s over 1.85-2.50 s; v20 must clear it on the two
+    # sides its elites pushed against, or the reopening is a no-op.
+    cap, hold = space.specs
+    assert cap.maximum > 22.9
+    assert hold.minimum < 1.85
+    context = search._checkpoint_context("faster-line-v20", base)
+    assert not set(context) & set(space.names)
+    # V19's two winning genes stay fixed rather than reverting to the v13 box.
+    assert "corner_target_speed_mps" in context
+    assert "front_stop_m" in context
+    assert search._full_evaluation_seeds("faster-line-v20", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v20", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v20", "--objective", "lap-time-v7"])
+    assert args.preset == "faster-line-v20"
+    assert args.objective == "lap-time-v7"
+    assert bake.parse_args(["--preset", "faster-line-v20"]).preset == "faster-line-v20"
+
+
+def test_faster_line_v21_retests_the_straight_speed_ceiling() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v21")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == ("straight_target_speed_mps", "front_brake_start_m")
+    # D-040 rejected 26-27 m/s under the old corner approach; the retest is
+    # meaningless unless the box actually reaches that range again.
+    straight, brake = space.specs
+    assert straight.maximum > 27.0
+    # A higher straight target only survives if the ramp may start further out
+    # than v4's 14.0 m ceiling.
+    assert brake.maximum > 14.0
+    context = search._checkpoint_context("faster-line-v21", base)
+    assert not set(context) & set(space.names)
+    # V19's corner approach and v16's launch both stay fixed, since the whole
+    # hypothesis is that they are what makes a higher straight target survivable.
+    for name in ("corner_target_speed_mps", "front_stop_m", "startup_speed_cap_mps"):
+        assert name in context
+    assert search._full_evaluation_seeds("faster-line-v21", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v21", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v21", "--objective", "lap-time-v7"])
+    assert args.preset == "faster-line-v21"
+    assert args.objective == "lap-time-v7"
+    assert bake.parse_args(["--preset", "faster-line-v21"]).preset == "faster-line-v21"
+
+
+def test_faster_line_v22_searches_the_speed_profile_under_best_lap_ranking() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v22")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == (
+        "straight_target_speed_mps",
+        "corner_target_speed_mps",
+        "front_brake_start_m",
+        "front_stop_m",
+    )
+    # The reopened bounds v19 and v21 established must survive into the joint
+    # space, or v22 re-imposes the boxes those runs disproved.
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    assert bounds["corner_target_speed_mps"][0] < 14.0
+    assert bounds["front_stop_m"][1] > 1.60
+    assert bounds["front_brake_start_m"][1] > 14.0
+    assert bounds["straight_target_speed_mps"][1] > 27.0
+    context = search._checkpoint_context("faster-line-v22", base)
+    assert not set(context) & set(space.names)
+    # The launch stays fixed: v20 proved it is already at its floor.
+    assert "startup_speed_cap_mps" in context
+    assert search._full_evaluation_seeds("faster-line-v22", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v22", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v22", "--objective", "lap-time-v8"])
+    assert args.preset == "faster-line-v22"
+    assert args.objective == "lap-time-v8"
+    assert bake.parse_args(["--preset", "faster-line-v22"]).preset == "faster-line-v22"
+
+
+def test_faster_line_v23_reopens_the_pinned_line_timing_bounds() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v23")
+    manifest = seeds.generate_seed_manifest()
+
+    assert space.names == ("line_turn_sensitivity", "line_target_release_per_tick")
+    # Both genes finished exactly on a bound of the box that last searched them:
+    # sensitivity on its 0.002 floor and release on its 0.25 ceiling.
+    sensitivity, release = space.specs
+    assert sensitivity.minimum < 0.002
+    assert release.maximum > 0.25
+    context = search._checkpoint_context("faster-line-v23", base)
+    assert not set(context) & set(space.names)
+    # The v19 corner approach stays fixed; v23 changes line timing, not pace.
+    for name in ("corner_target_speed_mps", "front_stop_m", "straight_target_speed_mps"):
+        assert name in context
+    assert search._full_evaluation_seeds("faster-line-v23", manifest) == manifest.training + manifest.official
+    assert search._selection_evaluation_seeds("faster-line-v23", manifest, 0)[-2:] == manifest.official
+    args = search.parse_args(["faster-line-v23", "--objective", "lap-time-v8"])
+    assert args.preset == "faster-line-v23"
+    assert args.objective == "lap-time-v8"
+    assert bake.parse_args(["--preset", "faster-line-v23"]).preset == "faster-line-v23"
