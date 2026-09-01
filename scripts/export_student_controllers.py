@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Export only student controller modules as a submission-ready zip file."""
+"""Export one targeted controller with its submission manifest and runtime files."""
 
 from __future__ import annotations
 
 import argparse
-import ast
+import json
 import re
 import zipfile
 from pathlib import Path
@@ -14,6 +14,8 @@ SOURCE_ROOT = PROJECT_ROOT / "src"
 CONTROLLERS_ROOT = SOURCE_ROOT / "controllers"
 DEFAULT_OUTPUT = PROJECT_ROOT / "artifacts" / "formula110-student-controllers.zip"
 MODULE_NAME_PATTERN = re.compile(r"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$")
+PROJECT_FILE_NAMES = ("pyproject.toml", "uv.lock")
+SUBMISSION_MANIFEST_NAME = "formula110-submission.json"
 
 
 def controller_module_name(value: str) -> str:
@@ -28,37 +30,23 @@ def module_source(module_name: str) -> Path:
     return SOURCE_ROOT.joinpath(*module_name.split(".")).with_suffix(".py")
 
 
-def selected_sources(module_names: tuple[str, ...], *, all_controllers: bool) -> tuple[Path, ...]:
-    """Return controller files to include in the student archive."""
-    if all_controllers:
-        if module_names:
-            raise ValueError("do not provide module names together with --all-controllers")
-        sources = tuple(
-            sorted(
-                path
-                for path in CONTROLLERS_ROOT.rglob("*")
-                if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
-            )
+def selected_sources(controller_module: str) -> tuple[Path, ...]:
+    """Validate one target module and return every controller runtime file."""
+    try:
+        controller_module_name(controller_module)
+    except argparse.ArgumentTypeError as error:
+        raise ValueError(str(error)) from error
+    target = module_source(controller_module)
+    if not target.is_file():
+        raise FileNotFoundError(f"controller source file not found: {target.relative_to(PROJECT_ROOT)}")
+
+    sources = tuple(
+        sorted(
+            path
+            for path in CONTROLLERS_ROOT.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc" and path.name != "py.typed"
         )
-    else:
-        if not module_names:
-            raise ValueError("provide at least one controller module or use --all-controllers")
-        pending = [module_source(module_name) for module_name in module_names]
-        sources_by_path: set[Path] = set()
-        while pending:
-            source = pending.pop()
-            if source in sources_by_path:
-                continue
-            if not source.is_file():
-                raise FileNotFoundError(f"controller source file not found: {source.relative_to(PROJECT_ROOT)}")
-            sources_by_path.add(source)
-            pending.extend(
-                dependency for dependency in local_controller_dependencies(source) if dependency not in sources_by_path
-            )
-        package_init = CONTROLLERS_ROOT / "__init__.py"
-        if package_init.is_file():
-            sources_by_path.add(package_init)
-        sources = tuple(sorted(sources_by_path))
+    )
 
     missing = tuple(path for path in sources if not path.is_file())
     if missing:
@@ -67,52 +55,37 @@ def selected_sources(module_names: tuple[str, ...], *, all_controllers: bool) ->
     return sources
 
 
-def local_controller_dependencies(source: Path) -> tuple[Path, ...]:
-    """Find statically imported modules within the controllers package."""
-    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
-    module_names: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            module_names.update(alias.name for alias in node.names if alias.name.startswith("controllers."))
-        elif isinstance(node, ast.ImportFrom):
-            imported_from = node.module or ""
-            if node.level > 0:
-                imported_from = f"controllers.{imported_from}".rstrip(".")
-            if imported_from.startswith("controllers."):
-                module_names.add(imported_from)
-            elif imported_from == "controllers":
-                module_names.update(f"controllers.{alias.name}" for alias in node.names)
-    return tuple(sorted(candidate for name in module_names if (candidate := module_source(name)).is_file()))
-
-
-def export_controllers(
-    module_names: tuple[str, ...],
-    output: Path,
-    *,
-    all_controllers: bool = False,
-) -> Path:
-    """Write selected controller sources beneath controllers/ in a zip file."""
-    sources = selected_sources(module_names, all_controllers=all_controllers)
+def export_controller(controller_module: str, output: Path) -> Path:
+    """Write the controller package, dependency metadata, and manifest to a zip."""
+    sources = selected_sources(controller_module)
+    project_files = tuple(PROJECT_ROOT / name for name in PROJECT_FILE_NAMES if (PROJECT_ROOT / name).is_file())
+    pyproject_path = PROJECT_ROOT / "pyproject.toml"
+    if pyproject_path not in project_files:
+        raise FileNotFoundError(f"project dependency file not found: {pyproject_path}")
     resolved_output = output.resolve()
     resolved_output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(resolved_output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for source in sources:
             archive.write(source, arcname=source.relative_to(SOURCE_ROOT))
+        for project_file in project_files:
+            archive.write(project_file, arcname=project_file.name)
+        archive.writestr(
+            SUBMISSION_MANIFEST_NAME,
+            json.dumps(
+                {"schema_version": 1, "controller_module": controller_module},
+                indent=2,
+            )
+            + "\n",
+        )
     return resolved_output
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "modules",
-        nargs="*",
+        "controller_module",
         type=controller_module_name,
-        help="controller modules to export, such as controllers.minimum_viable",
-    )
-    parser.add_argument(
-        "--all-controllers",
-        action="store_true",
-        help="export the complete src/controllers directory instead of selected modules",
+        help="one controller module to grade, such as controllers.race_faster",
     )
     parser.add_argument(
         "--output",
@@ -126,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     try:
-        output = export_controllers(tuple(args.modules), args.output, all_controllers=bool(args.all_controllers))
+        output = export_controller(str(args.controller_module), args.output)
     except (FileNotFoundError, ValueError) as error:
         raise SystemExit(f"error: {error}") from error
     print(output)

@@ -367,6 +367,7 @@ def test_corridor_boost_arms_drift_for_the_next_hard_corner() -> None:
         features,
         -0.50,
         1.0,
+        startup_elapsed_s=4.0,
         dt_s=1.0 / 60.0,
     )
 
@@ -374,6 +375,55 @@ def test_corridor_boost_arms_drift_for_the_next_hard_corner() -> None:
     assert steer == -0.75
     assert not controller.state.long_straight_drift_armed
     assert controller.state.long_straight_drift_seconds_remaining > 0.0
+
+
+def test_corridor_drift_can_override_the_opening_pulse_without_changing_it() -> None:
+    parameters = ControllerParameters(
+        startup_drift_brake=0.45,
+        startup_drift_trigger_front_m=9.0,
+        startup_drift_minimum_speed_mps=14.0,
+        startup_drift_minimum_steer=0.20,
+        startup_drift_pulse_seconds=0.05,
+        startup_drift_steer_gain=1.5,
+        long_straight_drift_brake=0.80,
+        long_straight_drift_trigger_front_m=14.0,
+        long_straight_drift_minimum_steer=0.08,
+        long_straight_drift_pulse_seconds=0.15,
+        long_straight_drift_override_after_seconds=10.0 / 3.0,
+    )
+    controller = PreviewController(parameters)
+    controller.state.long_straight_drift_armed = True
+    features = build_preview_features(
+        RobotSensors(
+            odometry=OdometrySensors(speed_mps=15.0),
+            wall_lidar=lidar(*(12.0 for _ in range(7))),
+            lidar=lidar(*(12.0 for _ in range(7))),
+        ),
+        parameters,
+    )
+
+    opening_steer, opening_throttle = controller._post_long_straight_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        -0.10,
+        1.0,
+        startup_elapsed_s=3.0,
+        dt_s=1.0 / 60.0,
+    )
+    steer, throttle = controller._post_long_straight_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        -0.10,
+        1.0,
+        startup_elapsed_s=4.0,
+        dt_s=1.0 / 60.0,
+    )
+
+    assert opening_throttle == 1.0
+    assert opening_steer == -0.10
+    assert throttle == -0.80
+    assert steer == pytest.approx(-0.15)
+    assert controller.state.long_straight_drift_seconds_remaining > parameters.startup_drift_pulse_seconds
+    assert parameters.startup_drift_brake == 0.45
+    assert parameters.startup_drift_trigger_front_m == 9.0
 
 
 def test_controller_still_brakes_during_avoidance() -> None:

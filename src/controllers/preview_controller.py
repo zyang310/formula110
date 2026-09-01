@@ -108,6 +108,17 @@ class ControllerParameters:
     long_straight_maximum_local_curvature: float = 0.0
     long_straight_speed_bonus_seconds: float = 0.0
     long_straight_target_speed_bonus_mps: float = 0.0
+    # The opening hairpin and the corner after the boosted corridor need
+    # different rotation impulses.  ``None`` preserves the legacy behaviour by
+    # falling back to the corresponding startup-drift value; setting these four
+    # fields lets a searched controller tune only the post-corridor pulse.  Its
+    # optional activation time keeps early-lap corridor detections on the proven
+    # opening values; ``None`` reuses ``startup_drift_window_seconds``.
+    long_straight_drift_brake: float | None = None
+    long_straight_drift_trigger_front_m: float | None = None
+    long_straight_drift_minimum_steer: float | None = None
+    long_straight_drift_pulse_seconds: float | None = None
+    long_straight_drift_override_after_seconds: float | None = None
     line_clearance_m: float = 0.0
     wall_balance_gain: float = 0.38
     normal_steer_limit: float = 0.92
@@ -311,6 +322,7 @@ class PreviewController:
                 features,
                 desired_steer,
                 throttle,
+                startup_elapsed_s=startup_elapsed_s,
                 dt_s=sensors.dt_s,
             )
 
@@ -434,12 +446,34 @@ class PreviewController:
         racing_steer: float,
         throttle: float,
         *,
+        startup_elapsed_s: float,
         dt_s: float,
     ) -> tuple[float, float]:
         """Spend an armed corridor boost on a short rotation pulse next corner."""
         parameters = self.parameters
         state = self.state
-        enabled = parameters.startup_drift_brake > 0.0 and parameters.startup_drift_pulse_seconds > 0.0
+        override_after_seconds = _fallback(
+            parameters.long_straight_drift_override_after_seconds,
+            parameters.startup_drift_window_seconds,
+        )
+        use_corridor_values = startup_elapsed_s >= override_after_seconds
+        brake = _fallback(
+            parameters.long_straight_drift_brake if use_corridor_values else None,
+            parameters.startup_drift_brake,
+        )
+        trigger_front_m = _fallback(
+            parameters.long_straight_drift_trigger_front_m if use_corridor_values else None,
+            parameters.startup_drift_trigger_front_m,
+        )
+        minimum_steer = _fallback(
+            parameters.long_straight_drift_minimum_steer if use_corridor_values else None,
+            parameters.startup_drift_minimum_steer,
+        )
+        pulse_seconds = _fallback(
+            parameters.long_straight_drift_pulse_seconds if use_corridor_values else None,
+            parameters.startup_drift_pulse_seconds,
+        )
+        enabled = brake > 0.0 and pulse_seconds > 0.0
         if not enabled or state.startup_drift_seconds_remaining > 0.0:
             return racing_steer, throttle
 
@@ -447,17 +481,17 @@ class PreviewController:
             front_m = min(features.wall_front, features.lidar_front) * parameters.lidar_cap_m
             should_start = (
                 features.speed_mps >= parameters.startup_drift_minimum_speed_mps
-                and abs(racing_steer) >= parameters.startup_drift_minimum_steer
-                and front_m <= parameters.startup_drift_trigger_front_m
+                and abs(racing_steer) >= minimum_steer
+                and front_m <= trigger_front_m
             )
             if should_start:
                 state.long_straight_drift_armed = False
                 state.long_straight_drift_direction = 1.0 if racing_steer >= 0.0 else -1.0
-                state.long_straight_drift_seconds_remaining = parameters.startup_drift_pulse_seconds
+                state.long_straight_drift_seconds_remaining = pulse_seconds
 
         if state.long_straight_drift_seconds_remaining <= 0.0:
             return racing_steer, throttle
-        held_magnitude = max(abs(racing_steer), parameters.startup_drift_minimum_steer)
+        held_magnitude = max(abs(racing_steer), minimum_steer)
         desired_steer = state.long_straight_drift_direction * _clamp(
             held_magnitude * parameters.startup_drift_steer_gain,
             0.0,
@@ -468,7 +502,7 @@ class PreviewController:
             0.0,
             state.long_straight_drift_seconds_remaining - step_seconds,
         )
-        return desired_steer, -_clamp(parameters.startup_drift_brake, 0.0, 1.0)
+        return desired_steer, -_clamp(brake, 0.0, 1.0)
 
     def _update_stall_state(self, sensors: RobotSensors, features: PreviewFeatures) -> None:
         distance_m = max(0.0, _finite_or(sensors.odometry.distance_m))
@@ -1124,6 +1158,11 @@ def _normalized_distance(value: float, cap_m: float) -> float:
 
 def _finite_or(value: float, fallback: float = 0.0) -> float:
     return value if isfinite(value) else fallback
+
+
+def _fallback(value: float | None, fallback: float) -> float:
+    """Resolve an optional behavior-specific override."""
+    return fallback if value is None else value
 
 
 def _unit_interval(value: float) -> float:

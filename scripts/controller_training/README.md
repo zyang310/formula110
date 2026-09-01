@@ -39,6 +39,7 @@ Run every command from the repository root.
 | `faster-line-v23` | 2 line-timing parameters that finished exactly on a bound | best-lap-first `lap_time_score_v8` with GA | **Closed** at generation 14; broke the 457-tick floor on one seed, but not on any worst-case key, so not promoted |
 | `faster-line-v24` | 8 global speed-cap and startup brake-turn drift parameters | best-lap-first `lap_time_score_v8` with GA | **Closed** after 10 flat generations; every winner left the new drift disabled |
 | `faster-line-v25` | 9 local-corridor speed-bonus and reusable drift parameters | bounded-incident `lap_time_score_v9` with GA | **Closed and promoted** at generation 10; 30/30 search trials clean, with 456-tick official best laps |
+| `faster-line-v26` | 8 long-corridor throttle, detection, braking, and steering-speed parameters | live-seed `speed_max_score_v1` with GA | **Closed** at generation 16 after 10 flat generations; generation 6 is baked separately into `race_speedmax` |
 
 ## Train
 
@@ -984,6 +985,39 @@ fully clean on all 30 search trials. Against v19, mean best lap improved from
 distance from 700.465 to 702.384 m. The official seeds both reached 456-tick
 (7.600 s) best laps; the 100-seed soak remained 100/100 clean and measured a
 27.215 m/s peak. This generation is baked into `controllers.race_faster`.
+
+### V26 full-throttle boundary from the human trace
+
+`artifacts/human-driving.jsonl` reached 36.444 m/s instantaneously and 33.695
+m/s over its best rolling one-second window. Its useful pattern was a 1.283 s
+full-throttle corridor segment followed by a coast before turning. The two long
+`-1.0` brake-turn pulses were not copied: they shed roughly 12-14 m/s, whereas
+v25's five-tick `-0.412` pulse loses less than 1 m/s.
+
+V26 reopened the long-straight target and hold parameters under a speed-first
+objective on the five live Gradescope seeds:
+
+```bash
+uv run python -m scripts.controller_training.search faster-line-v26 \
+  --optimizer ga --objective speed-max-v1 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v25-ga/generations/generation-010.json \
+  --artifact-root artifacts/controller-search/faster-line-v26-ga \
+  --population 48 --elites 10 --generations 16 \
+  --optimizer-seed 590139 --workers 5 --evaluator-recycle-trials 120
+```
+
+Generation 6 won and generations 7-16 were exactly flat. It reaches
+34.636-36.401 m/s peak across the five seeds. Validation with the live grading
+worker completed 2-3 laps on every seed and measured a 33.587 m/s mean of each
+seed's best rolling one-second speed, up from 26.309 m/s for `race_faster`.
+Damage ranged from 0.151 to 0.763, which is deliberately accepted by this
+specialized variant. The target-speed bonus finished on its 25 m/s ceiling, but
+the requested target is already about 50 m/s and therefore holds the normalized
+throttle command at its legal `1.0` ceiling. Raising the target again cannot add
+motor command; the next limit is usable corridor duration.
+
+The winner is baked into `controllers.race_speedmax`, leaving the clean
+lap-time controller unchanged.
 
 ### Finding the next revision
 

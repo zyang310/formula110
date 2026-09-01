@@ -99,6 +99,8 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "faster-line-v23",
             "faster-line-v24",
             "faster-line-v25",
+            "faster-line-v26",
+            "faster-line-v27",
         ),
     )
     return parser.parse_args(arguments)
@@ -109,9 +111,9 @@ def main(arguments: Sequence[str] | None = None) -> None:
     checkpoint = Path(args.checkpoint)
     if not checkpoint.exists():
         raise SystemExit(f"checkpoint not found: {checkpoint}")
-    from scripts.controller_training.search import _preset_configuration
+    from scripts.controller_training.search import preset_configuration
 
-    preset_base, _ = _preset_configuration(str(args.preset))
+    preset_base, _ = preset_configuration(str(args.preset))
     print(
         bake_block(
             checkpoint=checkpoint,

@@ -117,26 +117,43 @@ def test_export_selected_student_controller_uses_package_layout(tmp_path: Path) 
     exporter = load_exporter()
     output = tmp_path / "submission.zip"
 
-    built = exporter.export_controllers(("controllers.crash_fast",), output)
+    built = exporter.export_controller("controllers.crash_fast", output)
 
     assert built == output.resolve()
     with zipfile.ZipFile(output) as archive:
-        assert set(archive.namelist()) == {"controllers/__init__.py", "controllers/crash_fast.py"}
+        names = set(archive.namelist())
+        assert {
+            "controllers/__init__.py",
+            "controllers/crash_fast.py",
+            "formula110-submission.json",
+            "pyproject.toml",
+            "uv.lock",
+        } <= names
+        manifest = json.loads(archive.read("formula110-submission.json"))
+        assert manifest == {"schema_version": 1, "controller_module": "controllers.crash_fast"}
 
 
-def test_export_all_student_controllers_excludes_python_cache(tmp_path: Path) -> None:
+@pytest.mark.parametrize("arguments", [[], ["controllers.one", "controllers.two"]])
+def test_export_cli_requires_exactly_one_controller(arguments: list[str]) -> None:
+    exporter = load_exporter()
+
+    with pytest.raises(SystemExit):
+        exporter.build_parser().parse_args(arguments)
+
+
+def test_export_excludes_python_cache_and_type_marker(tmp_path: Path) -> None:
     exporter = load_exporter()
     output = tmp_path / "submission.zip"
 
-    exporter.export_controllers((), output, all_controllers=True)
+    exporter.export_controller("controllers.crash_fast", output)
 
     with zipfile.ZipFile(output) as archive:
         names = set(archive.namelist())
         assert "controllers/crash_fast.py" in names
-        assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
+        assert not any("__pycache__" in name or name.endswith(".pyc") or name.endswith("/py.typed") for name in names)
 
 
-def test_export_selected_controller_includes_local_python_dependencies(
+def test_export_selected_controller_includes_complete_runtime_tree(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     exporter = load_exporter()
@@ -146,11 +163,16 @@ def test_export_selected_controller_includes_local_python_dependencies(
     (controllers_root / "__init__.py").write_text("", encoding="utf-8")
     (controllers_root / "main.py").write_text("from controllers.helper import VALUE\n", encoding="utf-8")
     (controllers_root / "helper.py").write_text("VALUE: int = 1\n", encoding="utf-8")
+    (controllers_root / "weights.bin").write_bytes(b"checkpoint")
+    (controllers_root / "py.typed").write_text("", encoding="utf-8")
+    cache = controllers_root / "__pycache__"
+    cache.mkdir()
+    (cache / "main.cpython-311.pyc").write_bytes(b"cache")
     output = tmp_path / "submission.zip"
     monkeypatch.setattr(exporter, "SOURCE_ROOT", source_root)
     monkeypatch.setattr(exporter, "CONTROLLERS_ROOT", controllers_root)
 
-    exporter.export_controllers(("controllers.main",), output)
+    exporter.export_controller("controllers.main", output)
 
     with zipfile.ZipFile(output) as archive:
         names = set(archive.namelist())
@@ -158,14 +180,20 @@ def test_export_selected_controller_includes_local_python_dependencies(
             "controllers/__init__.py",
             "controllers/main.py",
             "controllers/helper.py",
+            "controllers/weights.bin",
+            "formula110-submission.json",
+            "pyproject.toml",
+            "uv.lock",
         } <= names
+        assert "controllers/py.typed" not in names
+        assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
 
 
 def test_export_student_controllers_reports_missing_module(tmp_path: Path) -> None:
     exporter = load_exporter()
 
     with pytest.raises(FileNotFoundError, match="not found"):
-        exporter.export_controllers(("controllers.does_not_exist",), tmp_path / "submission.zip")
+        exporter.export_controller("controllers.does_not_exist", tmp_path / "submission.zip")
 
 
 def test_minimum_only_submission_still_earns_all_minimum_points(monkeypatch: pytest.MonkeyPatch) -> None:

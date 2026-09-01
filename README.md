@@ -164,16 +164,26 @@ limit. Training-only libraries do not need to be imported by the runtime
 controller.
 
 Keep inference artifacts small, read-only, and addressed relative to the
-controller module rather than the current working directory. Export the full
-controller package when it uses non-Python files or dynamically loaded helpers:
+controller module rather than the current working directory. The exporter
+automatically includes the complete controller runtime tree and selects one
+module in the root manifest:
 
 ```bash
-uv run python scripts/export_student_controllers.py --all-controllers
+uv run python scripts/export_student_controllers.py controllers.race_faster
 ```
 
-The archive packages `src/controllers/`. Dependency declarations remain in
-`pyproject.toml` and `uv.lock`. Do not package training-only datasets, virtual
-environments, or experiment logs with the runtime controller.
+`controllers.race_faster` is the balanced lap-time controller. To submit the
+damage-tolerant long-corridor speed variant instead, select
+`controllers.race_speedmax` and give it a distinct output name:
+
+```bash
+uv run python scripts/export_student_controllers.py controllers.race_speedmax \
+  --output artifacts/formula110-race-speedmax-submission.zip
+```
+
+The archive packages `src/controllers/`, `pyproject.toml`, and `uv.lock`. Do not
+package training-only datasets, virtual environments, or experiment logs with
+the runtime controller.
 
 ## Capturing human demonstrations
 

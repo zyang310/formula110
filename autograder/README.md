@@ -72,31 +72,22 @@ fields display `No lap` while distance and speed are still reported.
 
 ## Exporting a student submission
 
-Students can export only the required controller modules—without the simulator,
-tests, notebooks, or other repository files—with:
+The deployed Gradescope assignment selects exactly one controller through a
+manifest. Export the fast controller with:
 
 ```bash
-uv run python scripts/export_student_controllers.py \
-  controllers.minimum_viable \
-  controllers.race_faster
+uv run python scripts/export_student_controllers.py controllers.race_faster
 ```
 
-The default output is `artifacts/formula110-student-controllers.zip`. Its files
-are rooted at `controllers/`, which the autograder accepts directly. Local
-`controllers.*` imports are followed recursively, so Python helper modules are
-included automatically. A student who has completed only the minimum milestone
-can export only that module:
+The default output is `artifacts/formula110-student-controllers.zip`. It
+contains all of the controller runtime files and these required root files:
 
-```bash
-uv run python scripts/export_student_controllers.py controllers.minimum_viable
-```
+- `formula110-submission.json`, selecting `controllers.race_faster`.
+- `pyproject.toml` and `uv.lock`, for dependency installation.
 
-For dynamically loaded modules or non-Python data files, export the complete
-directory:
-
-```bash
-uv run python scripts/export_student_controllers.py --all-controllers
-```
+Upload the ZIP itself without extracting it. The manifest must remain at the
+archive root. The exporter accepts exactly one `controllers.*` module because
+the deployed grader evaluates one selected car across all starting offsets.
 
 Enable leaderboards in the Gradescope assignment settings. Use the current
 Ubuntu 22.04 base image. `setup.sh` installs an isolated Python 3.11 runtime,

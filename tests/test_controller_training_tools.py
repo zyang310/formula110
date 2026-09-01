@@ -320,6 +320,8 @@ def _improved_trial(
     damage: float = 0.0,
     wall_contact_seconds: float = 0.0,
     lap_count: int = 1,
+    max_speed_mps: float = 20.0,
+    survived: bool = True,
     best_lap_time_seconds: float = 20.0,
     first_lap_time_seconds: float | None = None,
 ) -> Any:
@@ -330,9 +332,9 @@ def _improved_trial(
         partial_laps=raw_distance_m / 181.1,
         lap_count=lap_count,
         damage=damage,
-        survived=True,
+        survived=survived,
         wall_contact_seconds=wall_contact_seconds,
-        max_speed_mps=20.0,
+        max_speed_mps=max_speed_mps,
         first_lap_time_seconds=(best_lap_time_seconds if first_lap_time_seconds is None else first_lap_time_seconds),
         best_lap_time_seconds=best_lap_time_seconds,
     )
@@ -625,11 +627,77 @@ def test_lap_time_score_v9_allows_bounded_damage_but_rejects_excess() -> None:
     assert search.lap_time_score_v9((clean,), {}) > search.lap_time_score_v9((excessive,), {})
 
 
+def test_speed_max_score_allows_damage_but_rejects_elimination() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    safe = _improved_trial(evaluator, raw_distance_m=690.0, lap_count=3, max_speed_mps=30.0)
+    damaged_fast = _improved_trial(
+        evaluator,
+        raw_distance_m=650.0,
+        damage=0.90,
+        wall_contact_seconds=8.0,
+        lap_count=3,
+        max_speed_mps=36.0,
+    )
+    eliminated = _improved_trial(
+        evaluator,
+        raw_distance_m=710.0,
+        damage=1.0,
+        survived=False,
+        lap_count=3,
+        max_speed_mps=40.0,
+    )
+
+    assert search.speed_max_score_v1((damaged_fast,), {}) > search.speed_max_score_v1((safe,), {})
+    assert search.speed_max_score_v1((safe,), {}) > search.speed_max_score_v1((eliminated,), {})
+
+
+def test_lap_time_score_v10_balances_first_and_best_and_allows_damage() -> None:
+    search = load_tool("search")
+    evaluator = load_tool("evaluator")
+    clean_slow = _improved_trial(
+        evaluator,
+        raw_distance_m=700.0,
+        lap_count=3,
+        first_lap_time_seconds=512 / 60,
+        best_lap_time_seconds=456 / 60,
+    )
+    damaged_balanced = _improved_trial(
+        evaluator,
+        raw_distance_m=710.0,
+        damage=0.90,
+        wall_contact_seconds=5.0,
+        lap_count=3,
+        first_lap_time_seconds=500 / 60,
+        best_lap_time_seconds=440 / 60,
+    )
+    best_only_trade = _improved_trial(
+        evaluator,
+        raw_distance_m=710.0,
+        lap_count=3,
+        first_lap_time_seconds=530 / 60,
+        best_lap_time_seconds=430 / 60,
+    )
+    eliminated = _improved_trial(
+        evaluator,
+        raw_distance_m=720.0,
+        damage=1.0,
+        survived=False,
+        lap_count=3,
+        first_lap_time_seconds=490 / 60,
+        best_lap_time_seconds=420 / 60,
+    )
+
+    assert search.lap_time_score_v10((damaged_balanced,), {}) > search.lap_time_score_v10((clean_slow,), {})
+    assert search.lap_time_score_v10((damaged_balanced,), {}) > search.lap_time_score_v10((best_only_trade,), {})
+    assert search.lap_time_score_v10((clean_slow,), {}) > search.lap_time_score_v10((eliminated,), {})
+
+
 def test_faster_line_preset_is_isolated_and_uses_planned_bounds() -> None:
     search = load_tool("search")
 
     existing_names = search.faster_parameter_space().names
-    base, space = search._preset_configuration("faster-line")
+    base, space = search.preset_configuration("faster-line")
     bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
 
     assert existing_names == (
@@ -1565,3 +1633,73 @@ def test_faster_line_v25_searches_local_corridor_speed_under_relaxed_damage() ->
     assert args.preset == "faster-line-v25"
     assert args.objective == "lap-time-v9"
     assert bake.parse_args(["--preset", "faster-line-v25"]).preset == "faster-line-v25"
+
+
+def test_faster_line_v26_searches_the_live_full_throttle_boundary() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v26")
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == (
+        "straight_target_speed_mps",
+        "long_straight_minimum_duration_s",
+        "long_straight_maximum_local_curvature",
+        "long_straight_speed_bonus_seconds",
+        "long_straight_target_speed_bonus_mps",
+        "front_brake_start_m",
+        "front_stop_m",
+        "steering_speed_reduction",
+    )
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    assert bounds["straight_target_speed_mps"][1] == 45.0
+    assert bounds["long_straight_speed_bonus_seconds"][1] >= 3.0
+    assert bounds["long_straight_target_speed_bonus_mps"][1] >= 20.0
+    context = search._checkpoint_context("faster-line-v26", base)
+    assert not set(context) & set(space.names)
+    assert "startup_drift_brake" in context
+    assert search._full_evaluation_seeds("faster-line-v26", manifest) == search.GRADESCOPE_SPEED_SEEDS
+    assert search._selection_evaluation_seeds("faster-line-v26", manifest, 0) == search.GRADESCOPE_SPEED_SEEDS
+    args = search.parse_args(["faster-line-v26", "--objective", "speed-max-v1"])
+    assert args.preset == "faster-line-v26"
+    assert args.objective == "speed-max-v1"
+    assert bake.parse_args(["--preset", "faster-line-v26"]).preset == "faster-line-v26"
+
+
+def test_faster_line_v27_searches_ballistic_corridor_and_independent_drift() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v27")
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == (
+        "long_straight_minimum_duration_s",
+        "long_straight_maximum_local_curvature",
+        "long_straight_speed_bonus_seconds",
+        "long_straight_target_speed_bonus_mps",
+        "long_straight_drift_brake",
+        "long_straight_drift_minimum_steer",
+        "long_straight_drift_pulse_seconds",
+        "long_straight_drift_override_after_seconds",
+    )
+    assert base.long_straight_target_speed_bonus_mps == 8.0
+    assert base.long_straight_drift_brake == 0.90
+    assert base.long_straight_drift_override_after_seconds == pytest.approx(10.0 / 3.0)
+    assert base.startup_speed_cap_mps == RACE_FASTER_PARAMETERS.startup_speed_cap_mps
+    assert base.sweeper_target_speed_bonus_mps == RACE_FASTER_PARAMETERS.sweeper_target_speed_bonus_mps
+    assert base.sweeper_preview_target_speed_bonus_mps == RACE_FASTER_PARAMETERS.sweeper_preview_target_speed_bonus_mps
+    context = search._checkpoint_context("faster-line-v27", base)
+    assert not set(context) & set(space.names)
+    assert context["startup_drift_brake"] == RACE_FASTER_PARAMETERS.startup_drift_brake
+    expected_full = tuple(dict.fromkeys((*manifest.training, *search.GRADESCOPE_SPEED_SEEDS)))
+    expected_selection = tuple(
+        dict.fromkeys((*search.rotating_training_seeds(manifest.training, 0), *search.GRADESCOPE_SPEED_SEEDS))
+    )
+    assert search._full_evaluation_seeds("faster-line-v27", manifest) == expected_full
+    assert search._selection_evaluation_seeds("faster-line-v27", manifest, 0) == expected_selection
+    args = search.parse_args(["faster-line-v27", "--objective", "lap-time-v10"])
+    assert args.preset == "faster-line-v27"
+    assert args.objective == "lap-time-v10"
+    assert bake.parse_args(["--preset", "faster-line-v27"]).preset == "faster-line-v27"
