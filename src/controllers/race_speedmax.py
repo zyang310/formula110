@@ -17,6 +17,13 @@ RACING_COLOR: str = "#f7b32b"
 # artifacts/controller-search/faster-line-v26-ga/generations/generation-006.json.
 RACE_SPEEDMAX_PARAMETERS = replace(
     RACE_FASTER_PARAMETERS,
+    # Preserve the independently validated v26 behavior now that race_faster
+    # uses separate post-startup corridor-drift values.
+    long_straight_drift_brake=None,
+    long_straight_drift_trigger_front_m=None,
+    long_straight_drift_minimum_steer=None,
+    long_straight_drift_pulse_seconds=None,
+    long_straight_drift_override_after_seconds=None,
     long_straight_minimum_duration_s=0.34823084582388436,
     long_straight_maximum_local_curvature=0.005274529604018754,
     long_straight_speed_bonus_seconds=0.6414503014138803,

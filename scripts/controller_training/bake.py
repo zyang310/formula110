@@ -101,6 +101,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "faster-line-v25",
             "faster-line-v26",
             "faster-line-v27",
+            "faster-line-v28",
         ),
     )
     return parser.parse_args(arguments)

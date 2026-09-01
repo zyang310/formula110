@@ -8,13 +8,19 @@ from controllers.preview_controller import PreviewController
 RACING_NAME: str = "Race Faster"
 RACING_COLOR: str = "#f05a47"
 
-# Searched values from artifacts/controller-search/faster-line-v25-ga/generations/generation-010.json, generation 10.
+# Human-inspired corridor drift, searched in
+# artifacts/controller-search/faster-line-v27b-ga/generations/generation-017.json.
 RACE_FASTER_PARAMETERS = replace(
     MINIMUM_VIABLE_PARAMETERS,
-    long_straight_minimum_duration_s=0.27260799194145635,
-    long_straight_maximum_local_curvature=0.004555684426358618,
-    long_straight_speed_bonus_seconds=0.2357936093404097,
-    long_straight_target_speed_bonus_mps=0.5547473868287458,
+    long_straight_minimum_duration_s=0.2551447212626662,
+    long_straight_maximum_local_curvature=0.005558362853538455,
+    long_straight_speed_bonus_seconds=0.4704340603764563,
+    long_straight_target_speed_bonus_mps=7.816043512736939,
+    long_straight_drift_brake=0.9837796506105618,
+    long_straight_drift_trigger_front_m=14.0,
+    long_straight_drift_minimum_steer=0.06908986688717965,
+    long_straight_drift_pulse_seconds=0.1507770210285232,
+    long_straight_drift_override_after_seconds=3.55,
     startup_drift_brake=0.4124807290270464,
     startup_drift_trigger_front_m=10.489831198158283,
     startup_drift_minimum_steer=0.2523921041302151,

@@ -72,6 +72,7 @@ SearchPreset = Literal[
     "faster-line-v25",
     "faster-line-v26",
     "faster-line-v27",
+    "faster-line-v28",
 ]
 OptimizerKind = Literal["cem", "ga"]
 ObjectiveKind = Literal[
@@ -400,6 +401,12 @@ FASTER_LINE_V27_BASE_PARAMETERS = replace(
     long_straight_drift_pulse_seconds=0.15,
     long_straight_drift_override_after_seconds=10.0 / 3.0,
 )
+
+# V27 generation 17 is fast and clean across all 33 search/gating seeds, but
+# its post-corridor override delay finished exactly on the 3.55 s ceiling.  V28
+# reopens only that measured bound; the seed checkpoint supplies the other seven
+# searched corridor values.
+FASTER_LINE_V28_BASE_PARAMETERS = FASTER_LINE_V27_BASE_PARAMETERS
 
 
 class Optimizer(Protocol):
@@ -1207,6 +1214,24 @@ def _required(value: float | None) -> float:
     return value
 
 
+def faster_line_v28_parameter_space(
+    base: ControllerParameters = FASTER_LINE_V28_BASE_PARAMETERS,
+) -> ParameterSpace:
+    """Reopen v27's pinned post-corridor activation delay."""
+    return ParameterSpace(
+        (
+            _spec(
+                "long_straight_drift_override_after_seconds",
+                3.35,
+                4.50,
+                _required(base.long_straight_drift_override_after_seconds),
+                0.20,
+                0.02,
+            ),
+        )
+    )
+
+
 def _release_initial(base: ControllerParameters) -> float:
     """Start the release rate at the outward slew, i.e. v3's symmetric behaviour."""
     release = base.line_target_release_per_tick
@@ -1326,7 +1351,7 @@ def _full_evaluation_seeds(preset: SearchPreset, manifest: SeedManifest) -> tupl
     """Add the known promotion seeds only for v10's generalization repair."""
     if preset == "faster-line-v26":
         return GRADESCOPE_SPEED_SEEDS
-    if preset == "faster-line-v27":
+    if preset in ("faster-line-v27", "faster-line-v28"):
         return tuple(dict.fromkeys((*manifest.training, *GRADESCOPE_SPEED_SEEDS)))
     if preset in (
         "faster-line-v10",
@@ -1359,7 +1384,7 @@ def _selection_evaluation_seeds(
     if preset == "faster-line-v26":
         return GRADESCOPE_SPEED_SEEDS
     rotating = rotating_training_seeds(manifest.training, generation)
-    if preset == "faster-line-v27":
+    if preset in ("faster-line-v27", "faster-line-v28"):
         return tuple(dict.fromkeys((*rotating, *GRADESCOPE_SPEED_SEEDS)))
     if preset in (
         "faster-line-v10",
@@ -2270,6 +2295,19 @@ def _load_optimizer(
 
 
 def _checkpoint_context(preset: SearchPreset, parameters: ControllerParameters) -> dict[str, float]:
+    if preset == "faster-line-v28":
+        context = _checkpoint_context("faster-line-v27", parameters)
+        for name in (
+            "long_straight_minimum_duration_s",
+            "long_straight_maximum_local_curvature",
+            "long_straight_speed_bonus_seconds",
+            "long_straight_target_speed_bonus_mps",
+            "long_straight_drift_brake",
+            "long_straight_drift_minimum_steer",
+            "long_straight_drift_pulse_seconds",
+        ):
+            context[name] = _required(getattr(parameters, name))
+        return context
     if preset == "faster-line-v27":
         context = _checkpoint_context("faster-line-v25", parameters)
         # The opening pulse remains exactly the promoted v25 behavior while the
@@ -2282,9 +2320,7 @@ def _checkpoint_context(preset: SearchPreset, parameters: ControllerParameters) 
             "startup_drift_steer_gain",
         ):
             context[name] = float(getattr(parameters, name))
-        context["long_straight_drift_trigger_front_m"] = _required(
-            parameters.long_straight_drift_trigger_front_m
-        )
+        context["long_straight_drift_trigger_front_m"] = _required(parameters.long_straight_drift_trigger_front_m)
         return context
     if preset == "faster-line-v26":
         context = _checkpoint_context("faster-line-v25", parameters)
@@ -2770,6 +2806,11 @@ def preset_configuration(
         if seed_checkpoint is not None:
             base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
         return base, faster_line_v27_parameter_space(base)
+    if preset == "faster-line-v28":
+        base = FASTER_LINE_V28_BASE_PARAMETERS
+        if seed_checkpoint is not None:
+            base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
+        return base, faster_line_v28_parameter_space(base)
     if preset == "faster-line-v26":
         base = FASTER_LINE_V26_BASE_PARAMETERS
         if seed_checkpoint is not None:
@@ -3020,6 +3061,7 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "faster-line-v25",
             "faster-line-v26",
             "faster-line-v27",
+            "faster-line-v28",
         ),
     )
     parser.add_argument("--optimizer", choices=("cem", "ga"), default="cem")

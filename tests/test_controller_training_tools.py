@@ -1703,3 +1703,42 @@ def test_faster_line_v27_searches_ballistic_corridor_and_independent_drift() -> 
     assert args.preset == "faster-line-v27"
     assert args.objective == "lap-time-v10"
     assert bake.parse_args(["--preset", "faster-line-v27"]).preset == "faster-line-v27"
+
+
+def test_faster_line_v28_reopens_only_v27s_pinned_activation_delay(tmp_path: Path) -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+    checkpoint = tmp_path / "v27.json"
+    checkpoint.write_text(
+        json.dumps(
+            {
+                "best_parameter_vector": {
+                    "long_straight_minimum_duration_s": 0.2551447212626662,
+                    "long_straight_maximum_local_curvature": 0.005558362853538455,
+                    "long_straight_speed_bonus_seconds": 0.4704340603764563,
+                    "long_straight_target_speed_bonus_mps": 7.816043512736939,
+                    "long_straight_drift_brake": 0.9837796506105618,
+                    "long_straight_drift_minimum_steer": 0.06908986688717965,
+                    "long_straight_drift_pulse_seconds": 0.1507770210285232,
+                    "long_straight_drift_override_after_seconds": 3.55,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    base, space = search.preset_configuration("faster-line-v28", seed_checkpoint=checkpoint)
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == ("long_straight_drift_override_after_seconds",)
+    assert space.initial_mean == (3.55,)
+    assert space.specs[0].maximum > 3.55
+    context = search._checkpoint_context("faster-line-v28", base)
+    assert not set(context) & set(space.names)
+    assert context["long_straight_target_speed_bonus_mps"] == pytest.approx(7.816043512736939)
+    assert context["long_straight_drift_brake"] == pytest.approx(0.9837796506105618)
+    expected_full = tuple(dict.fromkeys((*manifest.training, *search.GRADESCOPE_SPEED_SEEDS)))
+    assert search._full_evaluation_seeds("faster-line-v28", manifest) == expected_full
+    args = search.parse_args(["faster-line-v28", "--objective", "lap-time-v10"])
+    assert args.preset == "faster-line-v28"
+    assert bake.parse_args(["--preset", "faster-line-v28"]).preset == "faster-line-v28"

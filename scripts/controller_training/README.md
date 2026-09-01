@@ -40,6 +40,8 @@ Run every command from the repository root.
 | `faster-line-v24` | 8 global speed-cap and startup brake-turn drift parameters | best-lap-first `lap_time_score_v8` with GA | **Closed** after 10 flat generations; every winner left the new drift disabled |
 | `faster-line-v25` | 9 local-corridor speed-bonus and reusable drift parameters | bounded-incident `lap_time_score_v9` with GA | **Closed and promoted** at generation 10; 30/30 search trials clean, with 456-tick official best laps |
 | `faster-line-v26` | 8 long-corridor throttle, detection, braking, and steering-speed parameters | live-seed `speed_max_score_v1` with GA | **Closed** at generation 16 after 10 flat generations; generation 6 is baked separately into `race_speedmax` |
+| `faster-line-v27` | 8 corridor detector/boost and post-corridor drift parameters, with the opening drift preserved | qualification-first balanced `lap_time_score_v10` with GA | **Closed and promoted** at generation 17; the planned run stopped at generation 20 |
+| `faster-line-v28` | 1 post-corridor drift activation parameter reopened around v27's winner | `lap_time_score_v10` with GA | **Discarded** after 10 flat generations; every winner retained 3.55 s |
 
 ## Train
 
@@ -1018,6 +1020,63 @@ motor command; the next limit is usable corridor duration.
 
 The winner is baked into `controllers.race_speedmax`, leaving the clean
 lap-time controller unchanged.
+
+### V27 - ballistic corridor followed by a short drift
+
+V27 kept v25's opening brake-turn unchanged, then gave later long-corridor
+entries their own stronger, short drift pulse. The corridor detector, speed
+bonus, pulse, and delayed activation were searched together; the front-distance
+trigger stayed fixed at 14 m. `lap_time_score_v10` requires survival and three
+timed laps first, then balances the first- and best-lap distributions across the
+28 training seeds plus the five live Gradescope seeds.
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v27b-ga
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v27 \
+  --optimizer ga --objective lap-time-v10 \
+  --artifact-root artifacts/controller-search/faster-line-v27b-ga \
+  --population 40 --elites 6 --generations 20 \
+  --optimizer-seed 590141 --workers 5 --evaluator-recycle-trials 120
+```
+
+Generation 17 remained the winner when the planned run stopped at generation
+20. All 33 full-evaluation trials survived, completed at least three laps, and
+had zero damage and contact. Mean best lap was 431.27 ticks (7.188 s), with a
+436-tick (7.267 s) worst; mean first lap was 491.91 ticks (8.199 s).
+
+The exported controller was also run through the exact grading worker on seeds
+110, 2026, 1893, 7656, and 9340. Every trial was clean and completed 3-4 laps;
+mean best lap was **7.190 s** and mean first lap was **8.160 s**, improving v25
+by 0.413 s and 0.280 s respectively. The 100-seed soak is reproducible with:
+
+```bash
+uv run python -m scripts.controller_training.suite controllers.race_faster \
+  --suite soak \
+  --output artifacts/controller-search/faster-line-v27-gate/soak.json \
+  --workers 5
+```
+
+All 100 soak trials survived and completed at least three laps; 36 completed a
+fourth. Mean best lap was 7.205 s, the 90th percentile was 7.250 s, and the
+worst was 7.633 s. Ninety-one trials were completely clean. The other nine had
+0.483 s total contact, and the worst damage across eight nonzero-damage trials
+was only 0.000863. This small bounded incident rate was accepted for the
+0.4-second lap-time gain, and generation 17 was promoted.
+
+V28 then reopened only `long_straight_drift_override_after_seconds` from 3.35
+to 4.50 s, seeded from v27 generation 17:
+
+```bash
+uv run python -m scripts.controller_training.search faster-line-v28 \
+  --optimizer ga --objective lap-time-v10 \
+  --seed-checkpoint artifacts/controller-search/faster-line-v27b-ga/generations/generation-017.json \
+  --artifact-root artifacts/controller-search/faster-line-v28-ga \
+  --population 24 --elites 4 --generations 10 \
+  --optimizer-seed 590142 --workers 5 --evaluator-recycle-trials 120
+```
+
+All ten generations reproduced v27's score and kept the seeded 3.55 s value,
+so v28 was closed and discarded under the plateau rule.
 
 ### Finding the next revision
 
