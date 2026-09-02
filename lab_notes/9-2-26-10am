@@ -1,0 +1,14 @@
+**Date and time:** 9/2/26 @ 10am
+**Participants and contributions:** Lucas, Zhi
+
+**Question or objective:** Compare results from approaches, figure out next steps
+
+**What we investigated or changed:** Observed results from both approaches - determined Zhi's model performed significantly better.
+
+**Evidence:**
+- **Commits or code:** race_faster_v30.py
+- **Leaderboard result, if applicable:** Lightning McQueen	(3.95 laps)
+
+**What we observed:** The racecar quickly makes it around the track, but there could be potential optimizations involving getting closer to the wall on the later curve / adding the ability to brush the wall.
+
+**Decision and rationale / next steps:** Zhi's model is our new best point. Lucas will investigate adding the wall brushing approach, Zhi will investigate whether Pytorch could be a more optimized approach. We'll also generate some new tracks for smoke testing.
