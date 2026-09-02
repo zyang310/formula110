@@ -22,6 +22,8 @@ from scripts.controller_training.seeds import SeedManifest, generate_seed_manife
 from controllers.minimum_viable import MINIMUM_VIABLE_PARAMETERS
 from controllers.preview_controller import ControllerParameters, PreviewController
 from controllers.race_faster import RACE_FASTER_PARAMETERS
+from controllers.race_faster_v29 import RACE_FASTER_V29_PARAMETERS
+from controllers.race_faster_v30 import RACE_FASTER_V30_PARAMETERS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ARTIFACT_ROOT = PROJECT_ROOT / "artifacts" / "controller-search"
@@ -73,6 +75,8 @@ SearchPreset = Literal[
     "faster-line-v26",
     "faster-line-v27",
     "faster-line-v28",
+    "faster-line-v29",
+    "faster-line-v30",
 ]
 OptimizerKind = Literal["cem", "ga"]
 ObjectiveKind = Literal[
@@ -407,6 +411,18 @@ FASTER_LINE_V27_BASE_PARAMETERS = replace(
 # reopens only that measured bound; the seed checkpoint supplies the other seven
 # searched corridor values.
 FASTER_LINE_V28_BASE_PARAMETERS = FASTER_LINE_V27_BASE_PARAMETERS
+
+# V29 turns the second useful human pattern into a sensor-only maneuver.  Two
+# consecutive opposite-turn previews identify the connector: the controller
+# carries speed through the first bend, rotates into the second, coasts until
+# heading alignment, then countersteers to arrest yaw before normal steering
+# takes over for the longer return edges.
+FASTER_LINE_V29_BASE_PARAMETERS = RACE_FASTER_V29_PARAMETERS
+
+# V30 follows the replacement human recording: it never countersteers after the
+# first rotation.  Instead it carries yaw neutrally, adds a short same-direction
+# hold, settles neutrally, and accelerates through the following long edge.
+FASTER_LINE_V30_BASE_PARAMETERS = RACE_FASTER_V30_PARAMETERS
 
 
 class Optimizer(Protocol):
@@ -1232,6 +1248,210 @@ def faster_line_v28_parameter_space(
     )
 
 
+def faster_line_v29_parameter_space(
+    base: ControllerParameters = FASTER_LINE_V29_BASE_PARAMETERS,
+) -> ParameterSpace:
+    """Search the human-inspired two-corner rotation and alignment sequence."""
+    return ParameterSpace(
+        (
+            _spec(
+                "transition_drift_minimum_speed_mps",
+                21.0,
+                25.0,
+                base.transition_drift_minimum_speed_mps,
+                0.70,
+                0.035,
+            ),
+            _spec(
+                "transition_drift_preview_curvature",
+                0.030,
+                0.060,
+                base.transition_drift_preview_curvature,
+                0.006,
+                0.0003,
+            ),
+            _spec(
+                "transition_drift_preview_seconds",
+                0.55,
+                0.95,
+                base.transition_drift_preview_seconds,
+                0.08,
+                0.004,
+            ),
+            _spec(
+                "transition_drift_target_speed_bonus_mps",
+                0.0,
+                2.0,
+                base.transition_drift_target_speed_bonus_mps,
+                0.40,
+                0.020,
+            ),
+            _spec("transition_drift_brake", 0.0, 0.35, base.transition_drift_brake, 0.07, 0.004),
+            _spec(
+                "transition_drift_steer_slew_per_tick",
+                0.12,
+                0.40,
+                base.transition_drift_steer_slew_per_tick,
+                0.06,
+                0.004,
+            ),
+            _spec(
+                "transition_drift_pulse_seconds",
+                1.0 / 60.0,
+                0.05,
+                base.transition_drift_pulse_seconds,
+                0.008,
+                0.001,
+            ),
+            _spec(
+                "transition_drift_coast_max_seconds",
+                0.0,
+                0.65,
+                base.transition_drift_coast_max_seconds,
+                0.12,
+                0.006,
+            ),
+            _spec(
+                "transition_drift_minimum_heading_error_degrees",
+                8.0,
+                20.0,
+                base.transition_drift_minimum_heading_error_degrees,
+                2.0,
+                0.10,
+            ),
+            _spec(
+                "transition_drift_alignment_heading_degrees",
+                1.0,
+                9.0,
+                base.transition_drift_alignment_heading_degrees,
+                1.6,
+                0.08,
+            ),
+            _spec(
+                "transition_drift_countersteer",
+                0.20,
+                0.85,
+                base.transition_drift_countersteer,
+                0.12,
+                0.006,
+            ),
+            _spec(
+                "transition_drift_countersteer_max_seconds",
+                1.0 / 60.0,
+                0.08,
+                base.transition_drift_countersteer_max_seconds,
+                0.015,
+                0.001,
+            ),
+            _spec(
+                "transition_drift_alignment_yaw_rate_degrees_per_s",
+                20.0,
+                120.0,
+                base.transition_drift_alignment_yaw_rate_degrees_per_s,
+                20.0,
+                1.0,
+            ),
+        )
+    )
+
+
+def faster_line_v30_parameter_space(
+    base: ControllerParameters = FASTER_LINE_V30_BASE_PARAMETERS,
+) -> ParameterSpace:
+    """Search the active human neutral-carry and same-direction hold sequence.
+
+    The detector is fixed at the seed-agnostic values that repeatedly reach
+    ROTATE on seed 110.  Reopening its speed/curvature/heading gates let the
+    first probe win by silently timing out in APPROACH, which answered nothing
+    about the maneuver itself.
+    """
+    return ParameterSpace(
+        (
+            _spec(
+                "transition_drift_target_speed_bonus_mps",
+                0.0,
+                2.0,
+                base.transition_drift_target_speed_bonus_mps,
+                0.40,
+                0.020,
+            ),
+            _spec("transition_drift_brake", 0.01, 0.25, base.transition_drift_brake, 0.05, 0.003),
+            _spec(
+                "transition_drift_steer_slew_per_tick",
+                0.12,
+                0.40,
+                base.transition_drift_steer_slew_per_tick,
+                0.06,
+                0.004,
+            ),
+            _spec(
+                "transition_drift_pulse_seconds",
+                1.0 / 60.0,
+                0.05,
+                base.transition_drift_pulse_seconds,
+                0.008,
+                0.001,
+            ),
+            _spec(
+                "transition_drift_coast_max_seconds",
+                0.0,
+                0.35,
+                base.transition_drift_coast_max_seconds,
+                0.07,
+                0.004,
+            ),
+            _spec(
+                "transition_drift_same_direction_hold_trigger_yaw_rate_degrees_per_s",
+                60.0,
+                170.0,
+                base.transition_drift_same_direction_hold_trigger_yaw_rate_degrees_per_s,
+                22.0,
+                1.0,
+            ),
+            _spec(
+                "transition_drift_same_direction_hold",
+                0.05,
+                0.60,
+                base.transition_drift_same_direction_hold,
+                0.10,
+                0.006,
+            ),
+            _spec(
+                "transition_drift_same_direction_hold_seconds",
+                1.0 / 60.0,
+                0.10,
+                base.transition_drift_same_direction_hold_seconds,
+                0.016,
+                0.001,
+            ),
+            _spec(
+                "transition_drift_settle_max_seconds",
+                0.0,
+                0.25,
+                base.transition_drift_settle_max_seconds,
+                0.05,
+                0.003,
+            ),
+            _spec(
+                "transition_drift_alignment_yaw_rate_degrees_per_s",
+                20.0,
+                100.0,
+                base.transition_drift_alignment_yaw_rate_degrees_per_s,
+                16.0,
+                1.0,
+            ),
+            _spec(
+                "transition_drift_edge_acceleration_seconds",
+                0.0,
+                0.90,
+                base.transition_drift_edge_acceleration_seconds,
+                0.18,
+                0.010,
+            ),
+        )
+    )
+
+
 def _release_initial(base: ControllerParameters) -> float:
     """Start the release rate at the outward slew, i.e. v3's symmetric behaviour."""
     release = base.line_target_release_per_tick
@@ -1351,7 +1571,7 @@ def _full_evaluation_seeds(preset: SearchPreset, manifest: SeedManifest) -> tupl
     """Add the known promotion seeds only for v10's generalization repair."""
     if preset == "faster-line-v26":
         return GRADESCOPE_SPEED_SEEDS
-    if preset in ("faster-line-v27", "faster-line-v28"):
+    if preset in ("faster-line-v27", "faster-line-v28", "faster-line-v29", "faster-line-v30"):
         return tuple(dict.fromkeys((*manifest.training, *GRADESCOPE_SPEED_SEEDS)))
     if preset in (
         "faster-line-v10",
@@ -1384,7 +1604,7 @@ def _selection_evaluation_seeds(
     if preset == "faster-line-v26":
         return GRADESCOPE_SPEED_SEEDS
     rotating = rotating_training_seeds(manifest.training, generation)
-    if preset in ("faster-line-v27", "faster-line-v28"):
+    if preset in ("faster-line-v27", "faster-line-v28", "faster-line-v29", "faster-line-v30"):
         return tuple(dict.fromkeys((*rotating, *GRADESCOPE_SPEED_SEEDS)))
     if preset in (
         "faster-line-v10",
@@ -2295,6 +2515,37 @@ def _load_optimizer(
 
 
 def _checkpoint_context(preset: SearchPreset, parameters: ControllerParameters) -> dict[str, float]:
+    if preset == "faster-line-v30":
+        context = _checkpoint_context("faster-line-v28", parameters)
+        context["long_straight_drift_override_after_seconds"] = _required(
+            parameters.long_straight_drift_override_after_seconds
+        )
+        for name in (
+            "transition_drift_minimum_speed_mps",
+            "transition_drift_preview_curvature",
+            "transition_drift_trigger_curvature",
+            "transition_drift_preview_seconds",
+            "transition_drift_steer",
+            "transition_drift_minimum_heading_error_degrees",
+            "transition_drift_alignment_heading_degrees",
+            "transition_drift_countersteer",
+            "transition_drift_countersteer_max_seconds",
+            "transition_drift_cooldown_seconds",
+        ):
+            context[name] = float(getattr(parameters, name))
+        return context
+    if preset == "faster-line-v29":
+        context = _checkpoint_context("faster-line-v28", parameters)
+        context["long_straight_drift_override_after_seconds"] = _required(
+            parameters.long_straight_drift_override_after_seconds
+        )
+        for name in (
+            "transition_drift_trigger_curvature",
+            "transition_drift_steer",
+            "transition_drift_cooldown_seconds",
+        ):
+            context[name] = float(getattr(parameters, name))
+        return context
     if preset == "faster-line-v28":
         context = _checkpoint_context("faster-line-v27", parameters)
         for name in (
@@ -2801,6 +3052,16 @@ def preset_configuration(
         if seed_checkpoint is not None:
             base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
         return base, faster_line_v17_parameter_space(base)
+    if preset == "faster-line-v30":
+        base = FASTER_LINE_V30_BASE_PARAMETERS
+        if seed_checkpoint is not None:
+            base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
+        return base, faster_line_v30_parameter_space(base)
+    if preset == "faster-line-v29":
+        base = FASTER_LINE_V29_BASE_PARAMETERS
+        if seed_checkpoint is not None:
+            base = replace(base, **_checkpoint_parameter_values(seed_checkpoint))
+        return base, faster_line_v29_parameter_space(base)
     if preset == "faster-line-v27":
         base = FASTER_LINE_V27_BASE_PARAMETERS
         if seed_checkpoint is not None:
@@ -3062,6 +3323,8 @@ def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
             "faster-line-v26",
             "faster-line-v27",
             "faster-line-v28",
+            "faster-line-v29",
+            "faster-line-v30",
         ),
     )
     parser.add_argument("--optimizer", choices=("cem", "ga"), default="cem")

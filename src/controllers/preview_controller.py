@@ -28,6 +28,20 @@ class ControlMode(Enum):
     RECOVER = "recover"
 
 
+class TransitionDriftPhase(Enum):
+    """Stages of the optional two-corner rotation and alignment maneuver."""
+
+    IDLE = "idle"
+    APPROACH = "approach"
+    ARMED = "armed"
+    ROTATE = "rotate"
+    COAST = "coast"
+    HOLD = "hold"
+    SETTLE = "settle"
+    EDGE_ACCEL = "edge_accel"
+    COUNTERSTEER = "countersteer"
+
+
 @dataclass(frozen=True, slots=True)
 class ControllerParameters:
     """Immutable policy parameters suitable for hand tuning or search."""
@@ -119,6 +133,35 @@ class ControllerParameters:
     long_straight_drift_minimum_steer: float | None = None
     long_straight_drift_pulse_seconds: float | None = None
     long_straight_drift_override_after_seconds: float | None = None
+    # Recognize two consecutive opposite-turn previews, carry extra speed through
+    # the first bend, then rotate into the second.  After the pulse the controller
+    # releases steering until its heading is aligned, then either briefly
+    # countersteers or follows the newer human sequence: a same-direction hold,
+    # a neutral settling interval, and acceleration through the following edge.
+    # This is the sensor-only version of the useful sequence in the human seed-110
+    # demonstration; it never reads seed, lap progress, or world coordinates.
+    # Zero brake or zero preview/pulse duration disables the behavior exactly.
+    transition_drift_minimum_speed_mps: float = 0.0
+    transition_drift_preview_curvature: float = 0.0
+    transition_drift_trigger_curvature: float = 0.0
+    transition_drift_preview_seconds: float = 0.0
+    transition_drift_target_speed_bonus_mps: float = 0.0
+    transition_drift_brake: float = 0.0
+    transition_drift_steer: float = 1.0
+    transition_drift_steer_slew_per_tick: float = 0.0
+    transition_drift_pulse_seconds: float = 0.0
+    transition_drift_coast_max_seconds: float = 0.0
+    transition_drift_minimum_heading_error_degrees: float = 0.0
+    transition_drift_alignment_heading_degrees: float = 0.0
+    transition_drift_countersteer: float = 0.0
+    transition_drift_countersteer_max_seconds: float = 0.0
+    transition_drift_alignment_yaw_rate_degrees_per_s: float = 0.0
+    transition_drift_same_direction_hold_trigger_yaw_rate_degrees_per_s: float = 0.0
+    transition_drift_same_direction_hold: float = 0.0
+    transition_drift_same_direction_hold_seconds: float = 0.0
+    transition_drift_settle_max_seconds: float = 0.0
+    transition_drift_edge_acceleration_seconds: float = 0.0
+    transition_drift_cooldown_seconds: float = 0.0
     line_clearance_m: float = 0.0
     wall_balance_gain: float = 0.38
     normal_steer_limit: float = 0.92
@@ -244,6 +287,11 @@ class ControllerState:
     startup_drift_direction: float = 0.0
     startup_drift_seconds_remaining: float = 0.0
     startup_drift_straighten_seconds_remaining: float = 0.0
+    transition_drift_phase: TransitionDriftPhase = TransitionDriftPhase.IDLE
+    transition_drift_direction: float = 0.0
+    transition_drift_seconds_remaining: float = 0.0
+    transition_drift_coast_neutral_tick_complete: bool = False
+    transition_drift_cooldown_seconds: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,12 +336,14 @@ class PreviewController:
         ):
             startup_speed_cap_mps = self.parameters.startup_speed_cap_mps
 
-        racing_steer, curvature, steering_diagnostics = self._preview_steer(features, sensors.dt_s)
+        racing_steer, curvature, line_shape, steering_diagnostics = self._preview_steer(features, sensors.dt_s)
         if self.state.mode is ControlMode.RECOVER:
+            self._cancel_transition_drift()
             desired_steer = self.state.recovery_steer
             throttle = self.parameters.recovery_reverse_throttle
             target_speed_mps = 0.0
         elif self.state.mode is ControlMode.AVOID:
+            self._cancel_transition_drift()
             desired_steer = self._avoidance_steer(features, racing_steer)
             throttle, target_speed_mps = self._speed_command(
                 features,
@@ -325,12 +375,32 @@ class PreviewController:
                 startup_elapsed_s=startup_elapsed_s,
                 dt_s=sensors.dt_s,
             )
+            desired_steer, throttle = self._transition_drift_command(
+                features,
+                line_shape,
+                desired_steer,
+                throttle,
+                dt_s=sensors.dt_s,
+            )
 
-        steer_slew = (
-            self.parameters.steer_slew_per_tick
-            if self.state.mode is ControlMode.NORMAL
-            else self.parameters.emergency_steer_slew_per_tick
-        )
+        if (
+            self.state.mode is ControlMode.NORMAL
+            and self.state.transition_drift_phase
+            in (
+                TransitionDriftPhase.ROTATE,
+                TransitionDriftPhase.COAST,
+                TransitionDriftPhase.HOLD,
+                TransitionDriftPhase.SETTLE,
+                TransitionDriftPhase.EDGE_ACCEL,
+                TransitionDriftPhase.COUNTERSTEER,
+            )
+            and self.parameters.transition_drift_steer_slew_per_tick > 0.0
+        ):
+            steer_slew = self.parameters.transition_drift_steer_slew_per_tick
+        elif self.state.mode is ControlMode.NORMAL:
+            steer_slew = self.parameters.steer_slew_per_tick
+        else:
+            steer_slew = self.parameters.emergency_steer_slew_per_tick
         steer = _slew(self.state.previous_steer, desired_steer, steer_slew)
         throttle = self._release_drive_latch(throttle, features.speed_mps)
         command = RobotCommand(
@@ -504,6 +574,260 @@ class PreviewController:
         )
         return desired_steer, -_clamp(brake, 0.0, 1.0)
 
+    def _transition_drift_command(
+        self,
+        features: PreviewFeatures,
+        shape: tuple[float, float],
+        racing_steer: float,
+        throttle: float,
+        *,
+        dt_s: float,
+    ) -> tuple[float, float]:
+        """Rotate and follow the configured sensor-only S-transition sequence."""
+        parameters = self.parameters
+        state = self.state
+        enabled = (
+            parameters.transition_drift_minimum_speed_mps > 0.0
+            and parameters.transition_drift_preview_curvature > 0.0
+            and parameters.transition_drift_trigger_curvature > 0.0
+            and parameters.transition_drift_preview_seconds > 0.0
+            and parameters.transition_drift_brake > 0.0
+            and parameters.transition_drift_pulse_seconds > 0.0
+        )
+        if not enabled:
+            return racing_steer, throttle
+
+        step_seconds = _clamp(_finite_or(dt_s, 1.0 / 60.0), 0.0, 0.25)
+        if state.transition_drift_phase is TransitionDriftPhase.IDLE:
+            state.transition_drift_cooldown_seconds = max(
+                0.0,
+                state.transition_drift_cooldown_seconds - step_seconds,
+            )
+            if state.transition_drift_cooldown_seconds > 0.0:
+                return racing_steer, throttle
+
+        # Existing opening/corridor pulses retain priority. Negative throttle in
+        # NORMAL only comes from one of those pulses, so it is also a useful guard
+        # on the exact tick its remaining-time counter reaches zero.
+        if (
+            state.startup_drift_seconds_remaining > 0.0
+            or state.long_straight_drift_seconds_remaining > 0.0
+            or throttle < 0.0
+        ):
+            self._cancel_transition_drift()
+            return racing_steer, throttle
+
+        near_turn, far_turn = shape
+        phase = state.transition_drift_phase
+        preview_curvature = parameters.transition_drift_preview_curvature
+        trigger_curvature = parameters.transition_drift_trigger_curvature
+        minimum_preview_near = min(preview_curvature, trigger_curvature) * 0.5
+        opposite_preview = (
+            near_turn * far_turn < 0.0 and abs(near_turn) >= minimum_preview_near and abs(far_turn) >= preview_curvature
+        )
+
+        if phase is TransitionDriftPhase.IDLE:
+            if features.speed_mps >= parameters.transition_drift_minimum_speed_mps and opposite_preview:
+                state.transition_drift_phase = TransitionDriftPhase.APPROACH
+                state.transition_drift_direction = _sign(far_turn)
+                state.transition_drift_seconds_remaining = parameters.transition_drift_preview_seconds
+            return racing_steer, throttle
+
+        if phase in (TransitionDriftPhase.APPROACH, TransitionDriftPhase.ARMED):
+            state.transition_drift_seconds_remaining = max(
+                0.0,
+                state.transition_drift_seconds_remaining - step_seconds,
+            )
+            if (
+                features.speed_mps < parameters.transition_drift_minimum_speed_mps
+                or state.transition_drift_seconds_remaining <= 0.0
+            ):
+                self._reset_transition_drift()
+                return racing_steer, throttle
+
+        if phase is TransitionDriftPhase.APPROACH:
+            next_direction = _sign(far_turn)
+            second_opposite_preview = (
+                near_turn * far_turn < 0.0
+                and abs(near_turn) >= preview_curvature
+                and abs(far_turn) >= preview_curvature
+                and next_direction == -state.transition_drift_direction
+            )
+            if second_opposite_preview:
+                state.transition_drift_phase = TransitionDriftPhase.ARMED
+                state.transition_drift_direction = next_direction
+                state.transition_drift_seconds_remaining = parameters.transition_drift_preview_seconds
+            return racing_steer, throttle
+
+        if phase is TransitionDriftPhase.ARMED:
+            direction = state.transition_drift_direction
+            crossed_into_second_turn = (
+                near_turn * direction >= trigger_curvature and far_turn * direction >= preview_curvature
+            )
+            if not crossed_into_second_turn:
+                return racing_steer, throttle
+
+            heading_error_degrees = abs(features.heading_error) * parameters.heading_error_cap_degrees
+            if heading_error_degrees < parameters.transition_drift_minimum_heading_error_degrees:
+                self._finish_transition_drift()
+                return racing_steer, throttle
+
+            state.transition_drift_phase = TransitionDriftPhase.ROTATE
+            state.transition_drift_seconds_remaining = parameters.transition_drift_pulse_seconds
+
+        if state.transition_drift_phase is TransitionDriftPhase.ROTATE:
+            desired_steer = state.transition_drift_direction * _clamp(
+                parameters.transition_drift_steer,
+                0.0,
+                1.0,
+            )
+            state.transition_drift_seconds_remaining = max(
+                0.0,
+                state.transition_drift_seconds_remaining - step_seconds,
+            )
+            if state.transition_drift_seconds_remaining <= 0.0:
+                state.transition_drift_phase = TransitionDriftPhase.COAST
+                state.transition_drift_seconds_remaining = parameters.transition_drift_coast_max_seconds
+                state.transition_drift_coast_neutral_tick_complete = False
+            return desired_steer, -_clamp(parameters.transition_drift_brake, 0.0, 1.0)
+
+        if state.transition_drift_phase is TransitionDriftPhase.COAST:
+            if parameters.transition_drift_same_direction_hold_seconds > 0.0:
+                if not state.transition_drift_coast_neutral_tick_complete:
+                    state.transition_drift_coast_neutral_tick_complete = True
+                    state.transition_drift_seconds_remaining = max(
+                        0.0,
+                        state.transition_drift_seconds_remaining - step_seconds,
+                    )
+                    return 0.0, throttle
+
+                yaw_rate_degrees_per_s = abs(features.yaw_rate) * parameters.yaw_rate_cap_degrees_per_s
+                hold_trigger = parameters.transition_drift_same_direction_hold_trigger_yaw_rate_degrees_per_s
+                ready_for_hold = hold_trigger > 0.0 and yaw_rate_degrees_per_s <= hold_trigger
+                if not ready_for_hold and state.transition_drift_seconds_remaining > 0.0:
+                    state.transition_drift_seconds_remaining = max(
+                        0.0,
+                        state.transition_drift_seconds_remaining - step_seconds,
+                    )
+                    return 0.0, throttle
+
+                state.transition_drift_phase = TransitionDriftPhase.HOLD
+                state.transition_drift_seconds_remaining = parameters.transition_drift_same_direction_hold_seconds
+                return self._transition_same_direction_hold(), throttle
+
+            heading_error_degrees = abs(features.heading_error) * parameters.heading_error_cap_degrees
+            countersteer_direction = -state.transition_drift_direction
+            countersteer_preview = (
+                near_turn * countersteer_direction >= trigger_curvature
+                and far_turn * countersteer_direction >= preview_curvature
+            )
+            aligned = heading_error_degrees <= parameters.transition_drift_alignment_heading_degrees
+            if not countersteer_preview and not aligned and state.transition_drift_seconds_remaining > 0.0:
+                state.transition_drift_seconds_remaining = max(
+                    0.0,
+                    state.transition_drift_seconds_remaining - step_seconds,
+                )
+                return 0.0, throttle
+
+            # The human trace stays neutral until the opposite bend enters both
+            # camera lookaheads. If the car settles first, or that cue never
+            # arrives before the bound, return to the ordinary line instead of
+            # inventing a timed countersteer.
+            if not countersteer_preview and parameters.transition_drift_coast_max_seconds > 0.0:
+                self._finish_transition_drift()
+                return racing_steer, throttle
+
+            state.transition_drift_phase = TransitionDriftPhase.COUNTERSTEER
+            state.transition_drift_seconds_remaining = parameters.transition_drift_countersteer_max_seconds
+            return self._transition_countersteer(), throttle
+
+        if state.transition_drift_phase is TransitionDriftPhase.HOLD:
+            desired_steer = self._transition_same_direction_hold()
+            state.transition_drift_seconds_remaining = max(
+                0.0,
+                state.transition_drift_seconds_remaining - step_seconds,
+            )
+            if state.transition_drift_seconds_remaining <= 0.0:
+                state.transition_drift_phase = TransitionDriftPhase.SETTLE
+                state.transition_drift_seconds_remaining = parameters.transition_drift_settle_max_seconds
+            return desired_steer, throttle
+
+        if state.transition_drift_phase is TransitionDriftPhase.SETTLE:
+            yaw_rate_degrees_per_s = abs(features.yaw_rate) * parameters.yaw_rate_cap_degrees_per_s
+            yaw_aligned = (
+                parameters.transition_drift_alignment_yaw_rate_degrees_per_s > 0.0
+                and yaw_rate_degrees_per_s <= parameters.transition_drift_alignment_yaw_rate_degrees_per_s
+            )
+            if not yaw_aligned and state.transition_drift_seconds_remaining > 0.0:
+                state.transition_drift_seconds_remaining = max(
+                    0.0,
+                    state.transition_drift_seconds_remaining - step_seconds,
+                )
+                return 0.0, throttle
+
+            state.transition_drift_phase = TransitionDriftPhase.EDGE_ACCEL
+            state.transition_drift_seconds_remaining = parameters.transition_drift_edge_acceleration_seconds
+            if state.transition_drift_seconds_remaining <= 0.0:
+                self._finish_transition_drift()
+            return racing_steer, throttle
+
+        if state.transition_drift_phase is TransitionDriftPhase.EDGE_ACCEL:
+            state.transition_drift_seconds_remaining = max(
+                0.0,
+                state.transition_drift_seconds_remaining - step_seconds,
+            )
+            if state.transition_drift_seconds_remaining <= 0.0:
+                self._finish_transition_drift()
+            return racing_steer, throttle
+
+        if state.transition_drift_phase is TransitionDriftPhase.COUNTERSTEER:
+            yaw_rate_degrees_per_s = abs(features.yaw_rate) * parameters.yaw_rate_cap_degrees_per_s
+            yaw_aligned = (
+                parameters.transition_drift_alignment_yaw_rate_degrees_per_s > 0.0
+                and yaw_rate_degrees_per_s <= parameters.transition_drift_alignment_yaw_rate_degrees_per_s
+            )
+            if yaw_aligned or state.transition_drift_seconds_remaining <= 0.0:
+                self._finish_transition_drift()
+                return racing_steer, throttle
+            desired_steer = self._transition_countersteer()
+            state.transition_drift_seconds_remaining = max(
+                0.0,
+                state.transition_drift_seconds_remaining - step_seconds,
+            )
+            if state.transition_drift_seconds_remaining <= 0.0:
+                self._finish_transition_drift()
+            return desired_steer, throttle
+
+        return racing_steer, throttle
+
+    def _transition_countersteer(self) -> float:
+        return -self.state.transition_drift_direction * _clamp(
+            self.parameters.transition_drift_countersteer,
+            0.0,
+            1.0,
+        )
+
+    def _transition_same_direction_hold(self) -> float:
+        return self.state.transition_drift_direction * _clamp(
+            self.parameters.transition_drift_same_direction_hold,
+            0.0,
+            1.0,
+        )
+
+    def _reset_transition_drift(self) -> None:
+        self.state.transition_drift_phase = TransitionDriftPhase.IDLE
+        self.state.transition_drift_direction = 0.0
+        self.state.transition_drift_seconds_remaining = 0.0
+        self.state.transition_drift_coast_neutral_tick_complete = False
+
+    def _finish_transition_drift(self) -> None:
+        self._reset_transition_drift()
+        self.state.transition_drift_cooldown_seconds = self.parameters.transition_drift_cooldown_seconds
+
+    def _cancel_transition_drift(self) -> None:
+        if self.state.transition_drift_phase is not TransitionDriftPhase.IDLE:
+            self._finish_transition_drift()
+
     def _update_stall_state(self, sensors: RobotSensors, features: PreviewFeatures) -> None:
         distance_m = max(0.0, _finite_or(sensors.odometry.distance_m))
         previous_distance_m = self.state.previous_distance_m
@@ -552,6 +876,7 @@ class PreviewController:
     ) -> tuple[
         float,
         float,
+        tuple[float, float],
         tuple[tuple[float, float, float], tuple[float, float], float, float, float, float, float, float] | None,
     ]:
         parameters = self.parameters
@@ -632,6 +957,7 @@ class PreviewController:
         return (
             _clamp(desired, -parameters.normal_steer_limit, parameters.normal_steer_limit),
             curvature,
+            line_shape,
             diagnostics,
         )
 
@@ -909,6 +1235,15 @@ class PreviewController:
             + (parameters.corner_target_speed_mps - parameters.straight_target_speed_mps) * curvature
         )
         speed_bonus = 0.0
+        if self.state.transition_drift_phase in (
+            TransitionDriftPhase.ROTATE,
+            TransitionDriftPhase.COAST,
+            TransitionDriftPhase.HOLD,
+            TransitionDriftPhase.SETTLE,
+            TransitionDriftPhase.EDGE_ACCEL,
+            TransitionDriftPhase.COUNTERSTEER,
+        ):
+            speed_bonus = max(speed_bonus, parameters.transition_drift_target_speed_bonus_mps)
         if self.state.sweeper_speed_hold_seconds > 0.0:
             speed_bonus = max(speed_bonus, parameters.sweeper_target_speed_bonus_mps)
         if self.state.sweeper_preview_speed_hold_seconds > 0.0:

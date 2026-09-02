@@ -1742,3 +1742,91 @@ def test_faster_line_v28_reopens_only_v27s_pinned_activation_delay(tmp_path: Pat
     args = search.parse_args(["faster-line-v28", "--objective", "lap-time-v10"])
     assert args.preset == "faster-line-v28"
     assert bake.parse_args(["--preset", "faster-line-v28"]).preset == "faster-line-v28"
+
+
+def test_faster_line_v29_searches_transition_rotation_and_alignment() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v29")
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == (
+        "transition_drift_minimum_speed_mps",
+        "transition_drift_preview_curvature",
+        "transition_drift_preview_seconds",
+        "transition_drift_target_speed_bonus_mps",
+        "transition_drift_brake",
+        "transition_drift_steer_slew_per_tick",
+        "transition_drift_pulse_seconds",
+        "transition_drift_coast_max_seconds",
+        "transition_drift_minimum_heading_error_degrees",
+        "transition_drift_alignment_heading_degrees",
+        "transition_drift_countersteer",
+        "transition_drift_countersteer_max_seconds",
+        "transition_drift_alignment_yaw_rate_degrees_per_s",
+    )
+    assert base.transition_drift_target_speed_bonus_mps == 0.50
+    assert base.transition_drift_countersteer > 0.0
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    assert bounds["transition_drift_target_speed_bonus_mps"] == (0.0, 2.0)
+    assert bounds["transition_drift_pulse_seconds"][1] == 0.05
+    assert bounds["transition_drift_coast_max_seconds"][1] == 0.65
+    assert bounds["transition_drift_minimum_heading_error_degrees"] == (8.0, 20.0)
+    context = search._checkpoint_context("faster-line-v29", base)
+    assert not set(context) & set(space.names)
+    assert context["transition_drift_trigger_curvature"] == 0.01
+    assert context["transition_drift_steer"] == 1.0
+    assert context["long_straight_drift_brake"] == RACE_FASTER_PARAMETERS.long_straight_drift_brake
+    expected_full = tuple(dict.fromkeys((*manifest.training, *search.GRADESCOPE_SPEED_SEEDS)))
+    assert search._full_evaluation_seeds("faster-line-v29", manifest) == expected_full
+    args = search.parse_args(["faster-line-v29", "--objective", "lap-time-v10"])
+    assert args.preset == "faster-line-v29"
+    assert args.objective == "lap-time-v10"
+    assert bake.parse_args(["--preset", "faster-line-v29"]).preset == "faster-line-v29"
+
+
+def test_faster_line_v30_searches_neutral_carry_same_direction_hold_and_edge() -> None:
+    search = load_tool("search")
+    bake = load_tool("bake")
+    seeds = load_tool("seeds")
+
+    base, space = search.preset_configuration("faster-line-v30")
+    manifest = seeds.generate_seed_manifest()
+    assert space.names == (
+        "transition_drift_target_speed_bonus_mps",
+        "transition_drift_brake",
+        "transition_drift_steer_slew_per_tick",
+        "transition_drift_pulse_seconds",
+        "transition_drift_coast_max_seconds",
+        "transition_drift_same_direction_hold_trigger_yaw_rate_degrees_per_s",
+        "transition_drift_same_direction_hold",
+        "transition_drift_same_direction_hold_seconds",
+        "transition_drift_settle_max_seconds",
+        "transition_drift_alignment_yaw_rate_degrees_per_s",
+        "transition_drift_edge_acceleration_seconds",
+    )
+    assert base.transition_drift_countersteer == 0.0
+    assert base.transition_drift_same_direction_hold > 0.0
+    assert base.transition_drift_edge_acceleration_seconds > 0.0
+    bounds = {spec.name: (spec.minimum, spec.maximum) for spec in space.specs}
+    assert bounds["transition_drift_brake"] == (0.01, 0.25)
+    assert bounds["transition_drift_same_direction_hold_seconds"][1] == 0.10
+    assert bounds["transition_drift_edge_acceleration_seconds"] == (0.0, 0.90)
+    context = search._checkpoint_context("faster-line-v30", base)
+    assert not set(context) & set(space.names)
+    assert context["transition_drift_trigger_curvature"] == 0.01
+    assert context["transition_drift_minimum_speed_mps"] == 22.0
+    assert context["transition_drift_minimum_heading_error_degrees"] == 0.0
+    assert context["transition_drift_countersteer"] == 0.0
+    assert context["transition_drift_cooldown_seconds"] == 2.50
+    expected_full = tuple(dict.fromkeys((*manifest.training, *search.GRADESCOPE_SPEED_SEEDS)))
+    expected_selection = tuple(
+        dict.fromkeys((*search.rotating_training_seeds(manifest.training, 0), *search.GRADESCOPE_SPEED_SEEDS))
+    )
+    assert search._full_evaluation_seeds("faster-line-v30", manifest) == expected_full
+    assert search._selection_evaluation_seeds("faster-line-v30", manifest, 0) == expected_selection
+    args = search.parse_args(["faster-line-v30", "--objective", "lap-time-v10"])
+    assert args.preset == "faster-line-v30"
+    assert args.objective == "lap-time-v10"
+    assert bake.parse_args(["--preset", "faster-line-v30"]).preset == "faster-line-v30"

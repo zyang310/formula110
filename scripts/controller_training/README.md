@@ -42,6 +42,8 @@ Run every command from the repository root.
 | `faster-line-v26` | 8 long-corridor throttle, detection, braking, and steering-speed parameters | live-seed `speed_max_score_v1` with GA | **Closed** at generation 16 after 10 flat generations; generation 6 is baked separately into `race_speedmax` |
 | `faster-line-v27` | 8 corridor detector/boost and post-corridor drift parameters, with the opening drift preserved | qualification-first balanced `lap_time_score_v10` with GA | **Closed and promoted** at generation 17; the planned run stopped at generation 20 |
 | `faster-line-v28` | 1 post-corridor drift activation parameter reopened around v27's winner | `lap_time_score_v10` with GA | **Discarded** after 10 flat generations; every winner retained 3.55 s |
+| `faster-line-v29` | 13 two-corner preview, speed, rotation, alignment, and countersteer parameters | `lap_time_score_v10` with GA | **Closed without promotion**; the active seed-110 prototype is retained for study, while the corrected multi-seed winner disables the maneuver |
+| `faster-line-v30` | 11 active neutral-carry, same-direction hold, settle, and edge-acceleration parameters | `lap_time_score_v10` with GA | **Closed without promotion**; the fastest clean active candidate loses 0.0677 s mean best-lap time across the 33-seed gate |
 
 ## Train
 
@@ -1077,6 +1079,146 @@ uv run python -m scripts.controller_training.search faster-line-v28 \
 
 All ten generations reproduced v27's score and kept the seeded 3.55 s value,
 so v28 was closed and discarded under the plateau rule.
+
+### V29 - opposite-turn connector rotation and alignment
+
+The second human pattern was not the long slide itself. After the first rotation,
+the car pointed through the gap between two corners, briefly corrected steering
+to the right, and then entered the longer return edges without another large
+direction change. V29 represents that sequence without track coordinates: it
+observes two consecutive opposite-turn previews, carries a bounded speed bonus
+through the first bend, rotates into the second, optionally releases steering
+until aligned, countersteers to arrest yaw, and returns control to the normal
+racing line.
+
+The first literal probe was rejected. A 6 m/s bonus plus a 0.20 s coast entered
+the connector near 29 m/s, reached 0.806 damage in 12 seconds, and did not finish
+a lap. Two-tick realized rotation pulses also caused later-lap contact. The safe
+starting point uses only a 0.5 m/s bonus, a 0.05 reverse-throttle request, a
+one-tick rotation request with 0.30 steering slew, no fixed coast, and at most
+two countersteer ticks. Before the passive-detection correction, this seed-110
+prototype was completely clean, moved the first lap from 8.200 s to 8.183 s,
+matched the 7.200 s best lap, and covered 737.86 m in 30 seconds versus 710.86 m
+for v27. The corrected active v29 preset completes four clean seed-110 laps and
+covers 734.48 m, with an 8.200 s first and 7.217 s best lap. Both active forms
+regress other live seeds, so v29 remains separate from `controllers.race_faster`.
+
+The human recording makes the connector interval concrete. In the main session,
+the braking rotation ends at 6.967 s; neutral steering then continues from 6.983
+through 7.617 s (about 0.63 s and 9.9 m), followed by right steering from 7.633
+through 7.933 s (about 0.30 s and 4.4 m). A direct sweep showed that copying the
+full 0.63 s neutral interval from the human entry pose is unsafe from v27's
+autonomous entry pose. A 0.12 s neutral interval remained clean and completed
+four seed-110 laps, but covered 733.72 m rather than the short prototype's
+737.86 m.
+
+The implementation now supports the transferable part of that observation: a
+positive coast bound holds zero desired steering until the opposite bend enters
+both camera lookaheads, releases harmlessly if the car aligns first or the bound
+expires, and only then permits the right countersteer. Detection is passive:
+the speed bonus and faster steering slew do not start during `APPROACH` or
+`ARMED`, so a rejected maneuver cannot perturb the baseline line. A minimum
+entry-heading gate was also added after live traces showed that seed 110 entered
+the useful rotation with substantially more heading error than the first
+opportunities on the other seeds.
+
+That gate did not solve generalization. Later harmful opportunities on other
+seeds converged to nearly the same heading, yaw, lateral offset, and wall ranges
+as seed 110's useful opportunity. The first 4-generation/20-member campaign
+found a clean active candidate, but its seed-110 replay never activated and was
+identical to v27 there. After the passive-detection and camera-cue corrections,
+the second 4-generation/24-member campaign selected
+`transition_drift_brake = 0.0` in generation 1 and retained that disabled winner
+through generation 4. The relevant checkpoints are:
+
+- `artifacts/controller-search/faster-line-v29-ga-round1/checkpoint.json`
+- `artifacts/controller-search/faster-line-v29-ga-round2/checkpoint.json`
+
+V29 is therefore closed for promotion. Its active preset remains a reproducible
+seed-110 specialty for studying this maneuver, while `controllers.race_faster`
+continues to use the clean v27 policy.
+
+Record the selected seed-110 behavior with:
+
+```bash
+uv run python -m scripts.controller_training.trace controllers.race_faster_v29 \
+  --seed 110 --seconds 30 \
+  --output artifacts/controller-search/faster-line-v29-diagnostics/v29-passive-gated-seed-110-30s.jsonl
+```
+
+Reproduce the corrected bounded generalization search with:
+
+```bash
+mkdir -p artifacts/controller-search/faster-line-v29-ga-round2
+nocorrect caffeinate -ims uv run python -m scripts.controller_training.search faster-line-v29 \
+  --optimizer ga --objective lap-time-v10 \
+  --artifact-root artifacts/controller-search/faster-line-v29-ga-round2 \
+  --population 24 --elites 6 --generations 4 \
+  --optimizer-seed 590144 --workers 5 --evaluator-recycle-trials 120
+```
+
+### V30 - neutral yaw carry, same-direction hold, and long-edge acceleration
+
+The replacement human recording changes the interpretation of the connector.
+Its 626 ticks contain no positive steering at all: after the main left rotation,
+the driver releases steering for about 0.23 s, adds another bounded left hold for
+about 0.20 s, releases again for about 0.37 s, and then accelerates through the
+long left edge. The useful transferable structure is therefore not v29's right
+countersteer; it is `rotate -> neutral carry -> same-direction hold -> neutral
+settle -> normal steering with a bounded speed bonus`.
+
+V30 implements that sequence behind five new default-off controller parameters.
+`HOLD`, `SETTLE`, and `EDGE_ACCEL` are separate traced phases. A positive hold
+duration selects the new path and bypasses v29's countersteer branch. COAST must
+emit at least one neutral desired-steering tick before its yaw-rate trigger can
+start the hold, so a high trigger cannot silently erase the human no-steering
+interval. Existing presets retain zero-valued defaults and are unchanged.
+
+The first conservative seed-110 probe executed once per lap and stayed clean,
+but produced a 7.400 s best lap and 39 avoidance ticks versus v27's 7.200 s and
+23 ticks. The best hand ablation shortened that deficit to 7.283 s. A first
+15-gene GA campaign appeared to recover the baseline exactly, but its selected
+minimum-speed gate reset the state in `APPROACH`; its trace was byte-for-byte
+the ordinary v27 behavior after detection and did not test the maneuver.
+
+The search preset now fixes the proven sensor detector and searches only 11
+active actuation/timing parameters, with a positive brake floor. The first
+active round still lacked a guaranteed COAST tick and finished at 7.303 s mean
+best lap with contact on 6 of 33 full-gate runs. After the neutral-tick fix, the
+final four-generation round selected a clean active candidate on all 33 seeds:
+
+- seed 110 best lap: 7.267 s, versus 7.200 s for v27;
+- seed 110 first lap: 8.283 s, versus 8.200 s;
+- 33-seed mean best lap: 7.256 s, versus 7.188 s;
+- 33-seed mean first lap: 8.255 s, versus 8.198 s;
+- damage/contact runs: 0/33 for both candidates.
+
+The fastest clean active vector is retained in
+`controllers.race_faster_v30` as a reproducible experiment, but v30 is closed
+without promotion. The data says the human sequence is controllable and safe
+when scaled down, yet the autonomous v27 entry is already faster through this
+sector than either human recording, so the extra rotation does not repay its
+speed loss.
+
+Relevant checkpoints and traces are:
+
+- `artifacts/controller-search/faster-line-v30-ga-round1/checkpoint.json`
+- `artifacts/controller-search/faster-line-v30-ga-active-round2/checkpoint.json`
+- `artifacts/controller-search/faster-line-v30-ga-neutral-round3/checkpoint.json`
+- `artifacts/controller-search/faster-line-v30-diagnostics/selected-seed-110-30s.jsonl`
+
+Reproduce the selected trace and corrected active search with:
+
+```bash
+uv run python -m scripts.controller_training.trace controllers.race_faster_v30 \
+  --seed 110 --seconds 30 \
+  --output artifacts/controller-search/faster-line-v30-diagnostics/selected-seed-110-30s.jsonl
+
+uv run python -m scripts.controller_training.search faster-line-v30 \
+  --optimizer ga --objective lap-time-v10 \
+  --artifact-root artifacts/controller-search/faster-line-v30-ga-neutral-round3 \
+  --population 16 --elites 4 --generations 4 --workers 8 --seconds 30
+```
 
 ### Finding the next revision
 

@@ -12,6 +12,8 @@ from controllers.preview_controller import (
     ControllerParameters,
     ControlMode,
     PreviewController,
+    PreviewFeatures,
+    TransitionDriftPhase,
     build_preview_features,
     track_curvature_preview,
     track_shape_preview,
@@ -424,6 +426,309 @@ def test_corridor_drift_can_override_the_opening_pulse_without_changing_it() -> 
     assert controller.state.long_straight_drift_seconds_remaining > parameters.startup_drift_pulse_seconds
     assert parameters.startup_drift_brake == 0.45
     assert parameters.startup_drift_trigger_front_m == 9.0
+
+
+def test_transition_drift_carries_speed_rotates_aligns_and_countersteers() -> None:
+    parameters = ControllerParameters(
+        straight_target_speed_mps=20.0,
+        corner_target_speed_mps=20.0,
+        steering_speed_reduction=0.0,
+        yaw_speed_reduction=0.0,
+        throttle_gain=1.0,
+        transition_drift_minimum_speed_mps=22.0,
+        transition_drift_preview_curvature=0.04,
+        transition_drift_trigger_curvature=0.01,
+        transition_drift_preview_seconds=0.75,
+        transition_drift_target_speed_bonus_mps=6.0,
+        transition_drift_brake=0.50,
+        transition_drift_steer=1.0,
+        transition_drift_pulse_seconds=1.0 / 60.0,
+        transition_drift_coast_max_seconds=0.20,
+        transition_drift_alignment_heading_degrees=3.0,
+        transition_drift_countersteer=0.70,
+        transition_drift_countersteer_max_seconds=0.12,
+        transition_drift_alignment_yaw_rate_degrees_per_s=60.0,
+        transition_drift_cooldown_seconds=2.0,
+    )
+    controller = PreviewController(parameters)
+    moving = RobotSensors(
+        dt_s=1.0 / 60.0,
+        odometry=OdometrySensors(speed_mps=23.0),
+        imu=ImuSensors(yaw_rate_degrees_per_s=-100.0),
+        camera=CameraSensors(heading_error_degrees=10.0),
+    )
+    features = build_preview_features(moving, parameters)
+
+    steer, throttle = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        (-0.01, 0.06),
+        0.20,
+        0.0,
+        dt_s=moving.dt_s,
+    )
+    assert (steer, throttle) == (0.20, 0.0)
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.APPROACH
+
+    throttle, target_speed = controller._speed_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        curvature=0.0,
+        steer=0.0,
+        avoiding=False,
+        startup_speed_cap_mps=None,
+    )
+    assert target_speed == 20.0
+    assert throttle == 0.0
+
+    controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        (0.08, -0.06),
+        0.20,
+        1.0,
+        dt_s=moving.dt_s,
+    )
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.ARMED
+
+    rotate_steer, rotate_throttle = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        (-0.02, -0.10),
+        0.20,
+        1.0,
+        dt_s=moving.dt_s,
+    )
+    assert (rotate_steer, rotate_throttle) == (-1.0, -0.50)
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.COAST
+
+    _, target_speed = controller._speed_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        curvature=0.0,
+        steer=0.0,
+        avoiding=False,
+        startup_speed_cap_mps=None,
+    )
+    assert target_speed == 26.0
+
+    coast_steer, coast_throttle = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=moving.dt_s,
+    )
+    assert (coast_steer, coast_throttle) == (0.0, 1.0)
+
+    countersteer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features,
+        (0.02, 0.06),
+        -0.20,
+        1.0,
+        dt_s=moving.dt_s,
+    )
+    assert countersteer == 0.70
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.COUNTERSTEER
+
+    yaw_aligned = build_preview_features(
+        replace(
+            moving,
+            imu=ImuSensors(yaw_rate_degrees_per_s=-30.0),
+            camera=CameraSensors(heading_error_degrees=1.0),
+        ),
+        parameters,
+    )
+    released_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        yaw_aligned,
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=moving.dt_s,
+    )
+    assert released_steer == -0.20
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.IDLE
+    assert controller.state.transition_drift_cooldown_seconds == 2.0
+
+
+def test_transition_drift_releases_without_countersteer_when_aligned() -> None:
+    parameters = ControllerParameters(
+        transition_drift_minimum_speed_mps=22.0,
+        transition_drift_preview_curvature=0.04,
+        transition_drift_trigger_curvature=0.01,
+        transition_drift_preview_seconds=0.75,
+        transition_drift_brake=0.50,
+        transition_drift_pulse_seconds=1.0 / 60.0,
+        transition_drift_coast_max_seconds=0.20,
+        transition_drift_alignment_heading_degrees=3.0,
+        transition_drift_countersteer=0.70,
+        transition_drift_countersteer_max_seconds=0.12,
+        transition_drift_cooldown_seconds=2.0,
+    )
+    controller = PreviewController(parameters)
+    controller.state.transition_drift_phase = TransitionDriftPhase.COAST
+    controller.state.transition_drift_direction = -1.0
+    controller.state.transition_drift_seconds_remaining = 0.20
+    aligned = build_preview_features(
+        RobotSensors(
+            dt_s=1.0 / 60.0,
+            odometry=OdometrySensors(speed_mps=23.0),
+            camera=CameraSensors(heading_error_degrees=2.0),
+        ),
+        parameters,
+    )
+
+    released_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        aligned,
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=1.0 / 60.0,
+    )
+    assert released_steer == -0.20
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.IDLE
+    assert controller.state.transition_drift_cooldown_seconds == 2.0
+
+
+def test_transition_drift_can_hold_same_direction_settle_and_accelerate() -> None:
+    parameters = ControllerParameters(
+        straight_target_speed_mps=20.0,
+        corner_target_speed_mps=20.0,
+        steering_speed_reduction=0.0,
+        yaw_speed_reduction=0.0,
+        throttle_gain=1.0,
+        transition_drift_minimum_speed_mps=22.0,
+        transition_drift_preview_curvature=0.04,
+        transition_drift_trigger_curvature=0.01,
+        transition_drift_preview_seconds=0.75,
+        transition_drift_target_speed_bonus_mps=5.0,
+        transition_drift_brake=0.25,
+        transition_drift_pulse_seconds=1.0 / 60.0,
+        transition_drift_coast_max_seconds=0.10,
+        transition_drift_same_direction_hold_trigger_yaw_rate_degrees_per_s=120.0,
+        transition_drift_same_direction_hold=0.35,
+        transition_drift_same_direction_hold_seconds=0.05,
+        transition_drift_settle_max_seconds=0.10,
+        transition_drift_alignment_yaw_rate_degrees_per_s=60.0,
+        transition_drift_edge_acceleration_seconds=0.20,
+        transition_drift_cooldown_seconds=2.0,
+    )
+    controller = PreviewController(parameters)
+    controller.state.transition_drift_phase = TransitionDriftPhase.COAST
+    controller.state.transition_drift_direction = -1.0
+    controller.state.transition_drift_seconds_remaining = 0.10
+
+    def features(yaw_rate: float) -> PreviewFeatures:
+        return build_preview_features(
+            RobotSensors(
+                dt_s=0.05,
+                odometry=OdometrySensors(speed_mps=23.0),
+                imu=ImuSensors(yaw_rate_degrees_per_s=yaw_rate),
+            ),
+            parameters,
+        )
+
+    coast_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features(-100.0),
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=0.05,
+    )
+    assert coast_steer == 0.0
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.COAST
+
+    hold_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features(-100.0),
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=0.05,
+    )
+    assert hold_steer == -0.35
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.HOLD
+
+    held_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features(-100.0),
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=0.05,
+    )
+    assert held_steer == -0.35
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.SETTLE
+
+    settle_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features(-100.0),
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=0.05,
+    )
+    assert settle_steer == 0.0
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.SETTLE
+
+    edge_steer, _ = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        features(-30.0),
+        (-0.05, -0.08),
+        -0.20,
+        1.0,
+        dt_s=0.05,
+    )
+    assert edge_steer == -0.20
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.EDGE_ACCEL
+
+    _, target_speed = controller._speed_command(  # pyright: ignore[reportPrivateUsage]
+        features(-30.0),
+        curvature=0.0,
+        steer=0.0,
+        avoiding=False,
+        startup_speed_cap_mps=None,
+    )
+    assert target_speed == 25.0
+
+    for _ in range(5):
+        controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+            features(-30.0),
+            (-0.05, -0.08),
+            -0.20,
+            1.0,
+            dt_s=0.05,
+        )
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.IDLE
+    assert controller.state.transition_drift_cooldown_seconds == 2.0
+
+
+def test_transition_drift_requires_the_favorable_entry_heading() -> None:
+    parameters = ControllerParameters(
+        transition_drift_minimum_speed_mps=22.0,
+        transition_drift_preview_curvature=0.04,
+        transition_drift_trigger_curvature=0.01,
+        transition_drift_preview_seconds=0.75,
+        transition_drift_brake=0.50,
+        transition_drift_pulse_seconds=1.0 / 60.0,
+        transition_drift_minimum_heading_error_degrees=12.0,
+        transition_drift_cooldown_seconds=2.0,
+    )
+    controller = PreviewController(parameters)
+    controller.state.transition_drift_phase = TransitionDriftPhase.ARMED
+    controller.state.transition_drift_direction = -1.0
+    controller.state.transition_drift_seconds_remaining = 0.50
+    shallow_entry = build_preview_features(
+        RobotSensors(
+            dt_s=1.0 / 60.0,
+            odometry=OdometrySensors(speed_mps=23.0),
+            camera=CameraSensors(heading_error_degrees=5.0),
+        ),
+        parameters,
+    )
+
+    steer, throttle = controller._transition_drift_command(  # pyright: ignore[reportPrivateUsage]
+        shallow_entry,
+        (-0.02, -0.08),
+        0.25,
+        1.0,
+        dt_s=1.0 / 60.0,
+    )
+
+    assert (steer, throttle) == (0.25, 1.0)
+    assert controller.state.transition_drift_phase is TransitionDriftPhase.IDLE
+    assert controller.state.transition_drift_cooldown_seconds == 2.0
 
 
 def test_controller_still_brakes_during_avoidance() -> None:

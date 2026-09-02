@@ -104,6 +104,7 @@ class TraceCollector:
             "time_s": sensors.tick * sensors.dt_s,
             "mode": diagnostics.mode.value,
             "speed_mps": sensors.odometry.speed_mps,
+            "heading_error_degrees": sensors.camera.heading_error_degrees,
             "yaw_rate_degrees_per_s": sensors.imu.yaw_rate_degrees_per_s,
             "yaw_rate_per_speed": abs(sensors.imu.yaw_rate_degrees_per_s) / max(abs(sensors.odometry.speed_mps), 1e-6),
             "throttle": command.throttle,
@@ -120,6 +121,13 @@ class TraceCollector:
             "long_straight_seconds": self.controller.state.long_straight_seconds,
             "long_straight_drift_armed": self.controller.state.long_straight_drift_armed,
             "long_straight_drift_seconds_remaining": self.controller.state.long_straight_drift_seconds_remaining,
+            "transition_drift_phase": self.controller.state.transition_drift_phase.value,
+            "transition_drift_direction": self.controller.state.transition_drift_direction,
+            "transition_drift_seconds_remaining": self.controller.state.transition_drift_seconds_remaining,
+            "transition_drift_coast_neutral_tick_complete": (
+                self.controller.state.transition_drift_coast_neutral_tick_complete
+            ),
+            "transition_drift_cooldown_seconds": self.controller.state.transition_drift_cooldown_seconds,
             "curvature": diagnostics.curvature,
             "kappa_0": diagnostics.kappa[0],
             "kappa_1": diagnostics.kappa[1],
