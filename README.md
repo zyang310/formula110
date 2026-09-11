@@ -84,6 +84,40 @@ over their corresponding seeded defaults.
 The simulator seed controls simulator placement only. It does not seed PyTorch,
 NumPy, a genetic algorithm, or stochastic controller inference.
 
+## Choosing a track
+
+The default circuit is `mugello-short`. Use `--track` to choose any registered
+layout:
+
+```bash
+uv run racing --track carolina-loop --seed 110
+
+uv run racing h2h \
+  --challenger-module controllers.candidate \
+  --incumbent-module controllers.baseline \
+  --track carolina-loop \
+  --seed 110
+```
+
+Five generated circuits provide a deliberate progression in complexity. Lengths
+are sampled centerline distances and may differ slightly from control-point
+polygon lengths:
+
+| Track ID | Complexity | Approx. length | Character |
+| --- | --- | ---: | --- |
+| `stadium-loop` | Beginner | 198 m | Broad sweepers interrupted by two mixed-direction chicanes |
+| `harbor-loop` | Easy | 249 m | Offset esses, a decreasing-radius bend, and a sharp hairpin |
+| `dogwood-loop` | Intermediate | 317 m | Six reverse-direction turns linked through asymmetric corner groups |
+| `blue-ridge-loop` | Advanced | 418 m | Tight switchbacks, late apexes, and unequal technical sectors |
+| `pine-switchbacks` | Expert | 547 m | Eleven reverse-direction turns across dense hairpins and compound esses |
+
+The original `mugello-short`, its `mugello-short-wide` and
+`mugello-short-long` variants, and `carolina-loop` remain available.
+Programmatic callers can inspect `TrackLayout.complexity` and set
+`GameConfig.track_id`, `HeadToHeadViewerConfig.track_id`, or the `track_id`
+argument to `run_headless_head_to_head()`. Head-to-head JSON records include the
+selected `track_id`.
+
 ## Packaging a controller
 
 A simple function is the smallest supported controller shape. Keep function
@@ -293,6 +327,7 @@ result = run_headless_head_to_head(
     incumbent_name=baseline.display_name or "baseline",
     race_count=7,
     random_seed=110,
+    track_id="carolina-loop",
 )
 record = result.to_dict()
 ```

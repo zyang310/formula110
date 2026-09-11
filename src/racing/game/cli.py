@@ -28,6 +28,7 @@ from racing.race.head_to_head import format_head_to_head_result, run_headless_he
 from racing.race.rules import HeadToHeadRaceRules, HeadToHeadScoring
 from racing.race.runtime import DEFAULT_RACE_RANDOM_SEED
 from racing.student.api import StudentControllerSubmission, load_student_submission
+from racing.track.world import TRACK_ID_MUGELLO_SHORT, track_layout_ids
 
 
 def _add_audio_arguments(parser: argparse.ArgumentParser) -> None:
@@ -83,6 +84,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_RACE_RANDOM_SEED,
         help="seed for the deterministic random starting position",
+    )
+    parser.add_argument(
+        "--track",
+        choices=track_layout_ids(),
+        default=TRACK_ID_MUGELLO_SHORT,
+        help="track layout to race on",
     )
     parser.add_argument(
         "--record-human",
@@ -157,6 +164,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=argparse.SUPPRESS,
         help="seed for deterministic random starting positions",
+    )
+    h2h_parser.add_argument(
+        "--track",
+        choices=track_layout_ids(),
+        default=argparse.SUPPRESS,
+        help="track layout to race on",
     )
     h2h_parser.add_argument("--win-margin-m", type=float, default=1.0, help="distance margin required for a win")
     h2h_parser.add_argument(
@@ -341,6 +354,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     race_count=int(args.races),
                     round_seconds=float(args.round_seconds),
                     random_seed=int(args.seed),
+                    track_id=str(args.track),
                     win_margin_m=rules.win_margin_m,
                     rules=rules,
                     window_type=cast(str | None, args.window_type),
@@ -377,6 +391,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             race_count=int(args.races),
             round_seconds=float(args.round_seconds),
             random_seed=int(args.seed),
+            track_id=str(args.track),
             rules=rules,
             challenger_copies=challenger_copies,
             incumbent_copies=incumbent_copies,
@@ -406,6 +421,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             student_controller=None if student_submission is None else student_submission.controller,
             fixed_delta_seconds=float(args.fixed_delta_seconds),
             random_seed=int(args.seed),
+            track_id=str(args.track),
             window_type=cast(str | None, args.window_type),
             human_recording_path=human_recording_path,
             team_color=_student_submission_color(student_submission, _team_color_from_args(args)),

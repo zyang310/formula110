@@ -17,6 +17,7 @@ from racing.graphics.colors import (
 from racing.race.rules import HeadToHeadRaceRules
 from racing.race.runtime import DEFAULT_RACE_RANDOM_SEED
 from racing.student.api import RobotController
+from racing.track.world import TRACK_ID_MUGELLO_SHORT
 
 DEFAULT_RACE_SECONDS = 30.0
 
@@ -78,6 +79,7 @@ class GameConfig:
     window_type: str | None = None
     fixed_delta_seconds: float = 1 / 60
     random_seed: int = DEFAULT_RACE_RANDOM_SEED
+    track_id: str = TRACK_ID_MUGELLO_SHORT
     team_color: ColorRGBA = DEFAULT_FORMULA_TEAM_COLOR
     spawn_position: tuple[float, float, float] | None = None
     spawn_heading_degrees: float | None = None
@@ -108,6 +110,7 @@ class HeadToHeadViewerConfig:
     race_count: int = 1
     round_seconds: float = DEFAULT_RACE_SECONDS
     random_seed: int = DEFAULT_RACE_RANDOM_SEED
+    track_id: str = TRACK_ID_MUGELLO_SHORT
     win_margin_m: float = 1.0
     rules: HeadToHeadRaceRules = field(default_factory=HeadToHeadRaceRules)
     fixed_delta_seconds: float = 1 / 60

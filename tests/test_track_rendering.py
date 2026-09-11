@@ -5,9 +5,6 @@ from typing import Any, cast
 
 import pytest
 
-from racing.physics import create_physics_world
-from racing.race.progress import default_track_progress_model
-from racing.race.runtime import seeded_race_start_finish_pose
 from racing.graphics.track_mesh import clean_offset_path
 from racing.graphics.track_rendering import (
     START_FINISH_ARGYLE_FLOOR_LENGTH,
@@ -29,7 +26,27 @@ from racing.graphics.track_rendering import (
     start_finish_render_pose,
     start_finish_track_slice,
 )
-from racing.track.world import TRACK_WIDTH, sampled_track_centerline
+from racing.physics import create_physics_world
+from racing.race.progress import default_track_progress_model
+from racing.race.runtime import seeded_race_start_finish_pose
+from racing.track.world import (
+    TRACK_ID_BLUE_RIDGE_LOOP,
+    TRACK_ID_DOGWOOD_LOOP,
+    TRACK_ID_HARBOR_LOOP,
+    TRACK_ID_PINE_SWITCHBACKS,
+    TRACK_ID_STADIUM_LOOP,
+    TRACK_WIDTH,
+    sampled_track_centerline,
+    track_layout_by_id,
+)
+
+GENERATED_TRACK_IDS = (
+    TRACK_ID_STADIUM_LOOP,
+    TRACK_ID_HARBOR_LOOP,
+    TRACK_ID_DOGWOOD_LOOP,
+    TRACK_ID_BLUE_RIDGE_LOOP,
+    TRACK_ID_PINE_SWITCHBACKS,
+)
 
 
 def test_kerb_center_rays_hit_flat_floor_collider() -> None:
@@ -53,6 +70,18 @@ def test_kerb_center_rays_hit_flat_floor_collider() -> None:
             assert hit.getNode().getName() == "grass-and-track-floor"
             assert float(hit.getHitPos()[1]) == pytest.approx(TRACK_SURFACE_Y, abs=1e-3)
             assert float(hit.getHitNormal()[1]) == pytest.approx(1.0, abs=1e-5)
+
+
+@pytest.mark.parametrize("track_id", GENERATED_TRACK_IDS)
+def test_generated_track_wall_offsets_remain_well_formed(track_id: str) -> None:
+    layout = track_layout_by_id(track_id)
+    samples = sampled_track_centerline(layout.points, samples_per_segment=10)
+    wall_outside_distance = TRACK_WIDTH / 2 + TRACK_EDGE_BUFFER + TRACK_WALL_THICKNESS
+
+    for side in (-1, 1):
+        cleaned_wall = clean_offset_path(samples, side * wall_outside_distance, 0.0)
+
+        assert len(cleaned_wall) >= len(samples) * 0.85
 
 
 def test_problem_seed_start_finish_poles_clear_outside_wall() -> None:
@@ -95,6 +124,7 @@ def test_start_finish_banner_is_tall_enough_for_formula_logo() -> None:
 
 
 def test_start_finish_floor_argyle_matches_texture_aspect_ratio() -> None:
-    assert START_FINISH_ARGYLE_FLOOR_WIDTH / START_FINISH_ARGYLE_FLOOR_LENGTH == pytest.approx(
-        START_FINISH_ARGYLE_TEXTURE_ASPECT_RATIO
+    assert (
+        pytest.approx(START_FINISH_ARGYLE_TEXTURE_ASPECT_RATIO)
+        == START_FINISH_ARGYLE_FLOOR_WIDTH / START_FINISH_ARGYLE_FLOOR_LENGTH
     )

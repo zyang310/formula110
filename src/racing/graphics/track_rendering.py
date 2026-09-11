@@ -7,7 +7,6 @@ from importlib import import_module
 from math import atan, atan2, degrees, hypot
 from typing import Any, cast
 
-from racing.physics import attach_static_box
 from racing.graphics.render_assets import (
     CAROLINA_BLUE_COLOR,
     INNER_WALL_LIGHTNESS_SCALE,
@@ -28,7 +27,16 @@ from racing.graphics.track_mesh import (
     wall_offsets_for_side,
     wall_paint_offsets_for_side,
 )
-from racing.track.world import START_POSITION, TRACK_SCALE, TRACK_WIDTH, TrackPoint, sampled_track_centerline, track_bounds
+from racing.physics import attach_static_box
+from racing.track.world import (
+    MUGELLO_SHORT_LAYOUT,
+    START_POSITION,
+    TRACK_SCALE,
+    TRACK_WIDTH,
+    TrackPoint,
+    sampled_track_centerline,
+    track_bounds,
+)
 
 START_HEADING_DEGREES = 90.0
 TRACK_CURB_GAP = 0.02 * TRACK_SCALE
@@ -199,10 +207,12 @@ def add_world_floor(
     ursina: Any,
     physics_world: Any,
     assets: SceneAssets,
+    points: tuple[TrackPoint, ...] = MUGELLO_SHORT_LAYOUT,
     include_collision: bool = True,
 ) -> None:
     """Draw the large ground plane under the whole track."""
-    bounds = track_bounds(margin=10 * TRACK_SCALE)
+    samples = sampled_track_centerline(points, samples_per_segment=10)
+    bounds = track_bounds(points=samples, margin=10 * TRACK_SCALE)
     center_x = (bounds.min_x + bounds.max_x) / 2
     center_z = (bounds.min_z + bounds.max_z) / 2
     floor_padding = 4 * TRACK_SCALE
@@ -218,7 +228,7 @@ def add_world_floor(
         color=(1, 1, 1, 1),
     )
     if include_collision:
-        add_world_floor_collision(physics_world=physics_world, render=ursina.scene)
+        add_world_floor_collision(physics_world=physics_world, render=ursina.scene, points=samples)
 
 
 def add_world_floor_collision(
@@ -248,17 +258,18 @@ def add_world_floor_collision(
     )
 
 
-def add_mugello_short_track(
+def add_track(
     *,
     ursina: Any,
     physics_world: Any,
     assets: SceneAssets,
+    points: tuple[TrackPoint, ...] = MUGELLO_SHORT_LAYOUT,
     start_line_position: TrackPoint = START_POSITION,
     start_line_heading_degrees: float = START_HEADING_DEGREES,
     include_collision: bool = True,
 ) -> Any:
-    """Draw the default Mugello-inspired track and optional colliders."""
-    samples = sampled_track_centerline(samples_per_segment=10)
+    """Draw a sampled track layout and optional colliders."""
+    samples = sampled_track_centerline(points, samples_per_segment=10)
     wall_inside_distance = TRACK_WIDTH / 2 + TRACK_EDGE_BUFFER
     track_light_receivers: list[Any] = []
 
@@ -352,13 +363,34 @@ def add_mugello_short_track(
     _add_track_night_lights(ursina=ursina, samples=samples, receivers=tuple(track_light_receivers))
 
     if include_collision:
-        add_mugello_short_track_collisions(physics_world=physics_world, render=ursina.scene)
+        add_mugello_short_track_collisions(physics_world=physics_world, render=ursina.scene, samples=samples)
 
     return _add_track_start_line(
         ursina=ursina,
         assets=assets,
         position=start_line_position,
         heading_degrees=start_line_heading_degrees,
+    )
+
+
+def add_mugello_short_track(
+    *,
+    ursina: Any,
+    physics_world: Any,
+    assets: SceneAssets,
+    start_line_position: TrackPoint = START_POSITION,
+    start_line_heading_degrees: float = START_HEADING_DEGREES,
+    include_collision: bool = True,
+) -> Any:
+    """Draw the default Mugello-inspired track and optional colliders."""
+    return add_track(
+        ursina=ursina,
+        physics_world=physics_world,
+        assets=assets,
+        points=MUGELLO_SHORT_LAYOUT,
+        start_line_position=start_line_position,
+        start_line_heading_degrees=start_line_heading_degrees,
+        include_collision=include_collision,
     )
 
 
@@ -1175,11 +1207,13 @@ def add_trackside_scenery(
     *,
     ursina: Any,
     assets: SceneAssets,
+    points: tuple[TrackPoint, ...] = MUGELLO_SHORT_LAYOUT,
     start_line_position: TrackPoint = START_POSITION,
     start_line_heading_degrees: float = START_HEADING_DEGREES,
 ) -> Any:
     """Add trees, lamps, and the start/finish gantry around the track."""
-    for index, position in enumerate(trackside_scenery_positions()):
+    samples = sampled_track_centerline(points, samples_per_segment=10)
+    for index, position in enumerate(trackside_scenery_positions(points=points)):
         x, y, z = position
         lit_entity(
             ursina,
@@ -1226,6 +1260,7 @@ def add_trackside_scenery(
         assets=assets,
         position=start_line_position,
         heading_degrees=start_line_heading_degrees,
+        samples=samples,
     )
 
 
@@ -1235,8 +1270,8 @@ def _add_start_finish_gantry(
     assets: SceneAssets,
     position: TrackPoint,
     heading_degrees: float,
+    samples: tuple[TrackPoint, ...],
 ) -> StartFinishGantry:
-    samples = sampled_track_centerline(samples_per_segment=10)
     root = ursina.Entity(name="start-finish-gantry")
     negative_side_pole = _add_start_finish_banner_pole(
         ursina=ursina,
@@ -1448,9 +1483,7 @@ def _nearest_start_finish_sample_segment_fraction(
         if segment_length_squared <= 0.0:
             continue
 
-        fraction = (
-            (position.x - sample.x) * segment_x + (position.z - sample.z) * segment_z
-        ) / segment_length_squared
+        fraction = ((position.x - sample.x) * segment_x + (position.z - sample.z) * segment_z) / segment_length_squared
         fraction = max(0.0, min(1.0, fraction))
         nearest_x = sample.x + segment_x * fraction
         nearest_z = sample.z + segment_z * fraction
@@ -1611,10 +1644,13 @@ def _start_finish_floor_argyle_mesh(ursina: Any) -> Any:
     return ursina.Mesh(vertices=vertices, triangles=triangles, uvs=uvs, normals=normals, static=True)
 
 
-def trackside_scenery_positions() -> tuple[tuple[float, float, float], ...]:
+def trackside_scenery_positions(
+    *,
+    points: tuple[TrackPoint, ...] = MUGELLO_SHORT_LAYOUT,
+) -> tuple[tuple[float, float, float], ...]:
     """List fixed decorative positions around the track."""
     bounds = track_bounds(
-        points=sampled_track_centerline(samples_per_segment=10),
+        points=sampled_track_centerline(points, samples_per_segment=10),
         margin=TRACK_LIGHT_SIDE_DISTANCE + 4.0 * TRACK_SCALE,
     )
     inset = 2.0 * TRACK_SCALE

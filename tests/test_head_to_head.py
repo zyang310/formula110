@@ -14,6 +14,7 @@ from racing.race.head_to_head import (
     head_to_head_race_entries,
     head_to_head_race_margin,
 )
+from racing.track.world import TRACK_ID_CAROLINA_LOOP
 
 
 def test_head_to_head_stats_compute_team_distances_and_contacts() -> None:
@@ -282,14 +283,16 @@ def test_head_to_head_result_has_versioned_json_compatible_record() -> None:
             ),
         ),
         random_seed=271,
+        track_id=TRACK_ID_CAROLINA_LOOP,
         fixed_delta_seconds=1 / 60,
     )
 
     record = result.to_dict()
     encoded = json.dumps(record, allow_nan=False)
 
-    assert record["schema_version"] == 1
+    assert record["schema_version"] == 2
     assert record["fixed_delta_seconds"] == pytest.approx(1 / 60)
+    assert record["track_id"] == TRACK_ID_CAROLINA_LOOP
     assert record["summary"] == {
         "winner": "challenger",
         "race_count": 1,

@@ -20,8 +20,8 @@ from racing.physics import (
 )
 from racing.race.progress import (
     TrackProjection,
-    default_track_progress_model,
     project_track_position,
+    track_progress_model_for_layout,
 )
 from racing.race.rules import (
     HEAD_TO_HEAD_DEFAULT_WIN_MARGIN_M,
@@ -43,11 +43,12 @@ from racing.race.runtime import (
 )
 from racing.race.sensors import build_robot_sensors
 from racing.student.api import RobotController, RobotSensors
+from racing.track.world import TRACK_ID_MUGELLO_SHORT, sampled_track_centerline, track_layout_by_id
 
 HEAD_TO_HEAD_DEFAULT_RACE_COUNT = 7
 HEAD_TO_HEAD_COPIES_PER_SIDE = 1
 HEAD_TO_HEAD_DEFAULT_ROUND_SECONDS = 30.0
-HEAD_TO_HEAD_RESULT_SCHEMA_VERSION = 1
+HEAD_TO_HEAD_RESULT_SCHEMA_VERSION = 2
 
 HeadToHeadRole = Literal["challenger", "incumbent"]
 HeadToHeadOutcome = Literal["challenger", "incumbent", "tie"]
@@ -274,6 +275,7 @@ class HeadToHeadResult:
     win_margin_m: float
     races: tuple[HeadToHeadRaceResult, ...]
     random_seed: int = DEFAULT_RACE_RANDOM_SEED
+    track_id: str = TRACK_ID_MUGELLO_SHORT
     rules: HeadToHeadRaceRules = field(default_factory=HeadToHeadRaceRules)
     fixed_delta_seconds: float = 1 / 60
 
@@ -330,6 +332,7 @@ class HeadToHeadResult:
             "round_seconds": self.round_seconds,
             "fixed_delta_seconds": self.fixed_delta_seconds,
             "random_seed": self.random_seed,
+            "track_id": self.track_id,
             "rules": self.rules.to_dict(),
             "summary": {
                 "winner": self.winner,
@@ -407,6 +410,7 @@ def run_headless_head_to_head(
     race_count: int = HEAD_TO_HEAD_DEFAULT_RACE_COUNT,
     round_seconds: float = HEAD_TO_HEAD_DEFAULT_ROUND_SECONDS,
     random_seed: int = DEFAULT_RACE_RANDOM_SEED,
+    track_id: str = TRACK_ID_MUGELLO_SHORT,
     win_margin_m: float | None = None,
     rules: HeadToHeadRaceRules | None = None,
     copies_per_side: int = HEAD_TO_HEAD_COPIES_PER_SIDE,
@@ -422,6 +426,7 @@ def run_headless_head_to_head(
         raise ValueError("round_seconds must be positive")
     if fixed_delta_seconds <= 0.0:
         raise ValueError("fixed_delta_seconds must be positive")
+    track_layout_by_id(track_id)
     resolved_challenger_copies, resolved_incumbent_copies = _head_to_head_copy_counts(
         copies_per_side=copies_per_side,
         challenger_copies=challenger_copies,
@@ -443,6 +448,7 @@ def run_headless_head_to_head(
                 race_index=race_index,
                 round_seconds=round_seconds,
                 random_seed=random_seed,
+                track_id=track_id,
                 rules=race_rules,
                 challenger_copies=resolved_challenger_copies,
                 incumbent_copies=resolved_incumbent_copies,
@@ -458,6 +464,7 @@ def run_headless_head_to_head(
             win_margin_m=race_rules.win_margin_m,
             races=races,
             random_seed=random_seed,
+            track_id=track_id,
             rules=race_rules,
             fixed_delta_seconds=fixed_delta_seconds,
         )
@@ -484,9 +491,7 @@ def format_head_to_head_result(result: HeadToHeadResult) -> str:
 def format_head_to_head_result_banner(result: HeadToHeadResult) -> str:
     """Format the compact winner and distance summary shown over a finished race."""
     winner_line = (
-        "RESULT: TIE"
-        if result.winner == "tie"
-        else f"WINNER: {_head_to_head_result_role_name(result, result.winner)}"
+        "RESULT: TIE" if result.winner == "tie" else f"WINNER: {_head_to_head_result_role_name(result, result.winner)}"
     )
     return "\n".join(
         (
@@ -515,7 +520,7 @@ def _head_to_head_metadata_line(result: HeadToHeadResult) -> str:
     return (
         f"Races: {result.race_count} | Round: {result.round_seconds:.1f}s | "
         f"{_head_to_head_result_copy_summary(result)} | Scoring: {result.rules.scoring} | "
-        f"Seed: {result.random_seed} | {_head_to_head_marshal_summary(result.rules)}"
+        f"Track: {result.track_id} | Seed: {result.random_seed} | {_head_to_head_marshal_summary(result.rules)}"
     )
 
 
@@ -862,17 +867,20 @@ def _run_headless_student_race(
     race_index: int,
     round_seconds: float,
     random_seed: int,
+    track_id: str,
     rules: HeadToHeadRaceRules,
     challenger_copies: int,
     incumbent_copies: int,
     fixed_delta_seconds: float,
     sensor_sample_callback: Callable[[HeadToHeadRaceEntry, RobotSensors], None] | None = None,
 ) -> HeadToHeadRaceResult:
-    model = default_track_progress_model()
+    track_layout = track_layout_by_id(track_id)
+    track_samples = sampled_track_centerline(track_layout.points, samples_per_segment=10)
+    model = track_progress_model_for_layout(track_id)
     physics_world = create_physics_world()
     physics_scene = PhysicsScene(world=physics_world, vehicles=[])
     root = render.attachNewNode(f"headless-h2h-{race_index}")
-    add_racing_scene_collisions(physics_world=physics_world, render=root)
+    add_racing_scene_collisions(physics_world=physics_world, render=root, samples=track_samples)
     entries = head_to_head_race_entries(
         race_index=race_index,
         random_seed=random_seed,

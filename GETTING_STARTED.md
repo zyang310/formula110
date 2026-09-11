@@ -61,6 +61,13 @@ Start manual keyboard control:
 uv run racing --seed 110
 ```
 
+To learn on the beginner circuit or try the expert switchbacks:
+
+```bash
+uv run racing --track stadium-loop --seed 110
+uv run racing --track pine-switchbacks --seed 110
+```
+
 The seed chooses a random position on the track. Reusing the same seed starts
 at the same position, which is useful when comparing driving strategies.
 

@@ -13,6 +13,15 @@ from racing.graphics.colors import (
     DEFAULT_FORMULA_TEAM_COLOR,
     DEFAULT_INCUMBENT_TEAM_COLOR,
 )
+from racing.track.world import (
+    TRACK_ID_BLUE_RIDGE_LOOP,
+    TRACK_ID_CAROLINA_LOOP,
+    TRACK_ID_DOGWOOD_LOOP,
+    TRACK_ID_HARBOR_LOOP,
+    TRACK_ID_MUGELLO_SHORT,
+    TRACK_ID_PINE_SWITCHBACKS,
+    TRACK_ID_STADIUM_LOOP,
+)
 
 
 class _FakeApp:
@@ -52,6 +61,35 @@ def test_parser_defaults_to_drone_camera() -> None:
 
     assert playable_args.camera == CameraView.DRONE.value
     assert head_to_head_args.camera == CameraView.DRONE.value
+
+
+def test_parser_selects_tracks_in_both_racing_modes() -> None:
+    parser = build_argument_parser()
+    playable_args = parser.parse_args(["--track", TRACK_ID_CAROLINA_LOOP])
+    head_to_head_args = parser.parse_args(["h2h", "--track", TRACK_ID_CAROLINA_LOOP])
+
+    assert playable_args.track == TRACK_ID_CAROLINA_LOOP
+    assert head_to_head_args.track == TRACK_ID_CAROLINA_LOOP
+
+
+def test_parser_accepts_each_generated_track() -> None:
+    parser = build_argument_parser()
+
+    for track_id in (
+        TRACK_ID_STADIUM_LOOP,
+        TRACK_ID_HARBOR_LOOP,
+        TRACK_ID_DOGWOOD_LOOP,
+        TRACK_ID_BLUE_RIDGE_LOOP,
+        TRACK_ID_PINE_SWITCHBACKS,
+    ):
+        assert parser.parse_args(["--track", track_id]).track == track_id
+
+
+def test_parser_defaults_to_mugello_short_track() -> None:
+    parser = build_argument_parser()
+
+    assert parser.parse_args([]).track == TRACK_ID_MUGELLO_SHORT
+    assert parser.parse_args(["h2h"]).track == TRACK_ID_MUGELLO_SHORT
 
 
 def test_head_to_head_parser_defaults_to_thirty_second_race() -> None:
@@ -145,6 +183,8 @@ def test_headless_cli_prints_json_result(
             str(controller_path),
             "--seed",
             "271",
+            "--track",
+            TRACK_ID_CAROLINA_LOOP,
             "--json",
         ]
     )
@@ -152,6 +192,7 @@ def test_headless_cli_prints_json_result(
     output = json.loads(capsys.readouterr().out)
     assert output == {"schema_version": 1, "summary": {"winner": "challenger"}}
     assert captured_arguments["random_seed"] == 271
+    assert captured_arguments["track_id"] == TRACK_ID_CAROLINA_LOOP
 
 
 def test_cli_passes_human_recording_path_to_playable_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -185,6 +226,22 @@ def test_cli_passes_seed_to_playable_config(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert captured_config is not None
     assert captured_config.random_seed == 271
+
+
+def test_cli_passes_track_to_playable_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_config: GameConfig | None = None
+
+    def fake_create_app(config: GameConfig) -> _FakeApp:
+        nonlocal captured_config
+        captured_config = config
+        return _FakeApp()
+
+    monkeypatch.setattr(cli, "create_app", fake_create_app)
+
+    cli.main(["--track", TRACK_ID_CAROLINA_LOOP])
+
+    assert captured_config is not None
+    assert captured_config.track_id == TRACK_ID_CAROLINA_LOOP
 
 
 def test_cli_rejects_recording_an_automated_controller(tmp_path: Path) -> None:

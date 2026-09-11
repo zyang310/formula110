@@ -31,6 +31,7 @@ from racing.graphics.colors import (
 from racing.race.head_to_head import HeadToHeadRaceEntry
 from racing.race.runtime import DEFAULT_RACE_RANDOM_SEED
 from racing.student.api import default_student_controller
+from racing.track.world import TRACK_ID_MUGELLO_SHORT
 
 
 def test_parse_window_size_accepts_width_by_height() -> None:
@@ -64,6 +65,11 @@ def test_racing_views_default_to_drone_camera() -> None:
 def test_racing_modes_share_default_random_seed() -> None:
     assert GameConfig().random_seed == DEFAULT_RACE_RANDOM_SEED
     assert HeadToHeadViewerConfig().random_seed == DEFAULT_RACE_RANDOM_SEED
+
+
+def test_racing_modes_share_default_track() -> None:
+    assert GameConfig().track_id == TRACK_ID_MUGELLO_SHORT
+    assert HeadToHeadViewerConfig().track_id == TRACK_ID_MUGELLO_SHORT
 
 
 def test_head_to_head_races_default_to_thirty_seconds() -> None:
@@ -117,6 +123,11 @@ def test_playable_scene_rejects_human_recording_with_student_controller(tmp_path
                 human_recording_path=tmp_path / "invalid.jsonl",
             )
         )
+
+
+def test_playable_scene_rejects_unknown_track_before_building_window() -> None:
+    with pytest.raises(ValueError, match="unknown track layout"):
+        build_scene(GameConfig(track_id="missing"))
 
 
 def test_default_head_to_head_colors_use_fordham_fountain_versus_carolina_blue() -> None:

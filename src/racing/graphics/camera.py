@@ -8,8 +8,6 @@ from math import atan2, cos, degrees, exp, radians, sin
 from typing import Any, TypeAlias
 
 from racing.game.config import CameraView
-from racing.race.progress import TrackProgressModel, project_track_position, track_pose_at_distance
-from racing.track.spatial import node_position, track_forward_vector
 from racing.graphics.track_rendering import (
     TRACK_EDGE_BUFFER,
     TRACK_SURFACE_Y,
@@ -17,6 +15,8 @@ from racing.graphics.track_rendering import (
     TRACK_WALL_HEIGHT,
     TRACK_WALL_THICKNESS,
 )
+from racing.race.progress import TrackProgressModel, project_track_position, track_pose_at_distance
+from racing.track.spatial import node_position, track_forward_vector
 from racing.track.world import TRACK_SCALE, TRACK_WIDTH, TrackPoint, sampled_track_centerline, track_bounds
 
 TRACK_CAMERA_MARGIN = TRACK_WIDTH / 2 + TRACK_EDGE_BUFFER + TRACK_WALL_THICKNESS
@@ -166,7 +166,7 @@ def apply_camera_view(
 ) -> None:
     """Move the Ursina camera to match the requested simulator view."""
     target_x, target_y, target_z = node_position(target)
-    camera_frame = _track_camera_frame()
+    camera_frame = _track_camera_frame(None if track_model is None else track_model.points)
     viewport_aspect = _viewport_aspect_ratio(ursina)
     ursina.camera.parent = ursina.scene
 
@@ -272,9 +272,10 @@ def apply_camera_view(
     ursina.camera.setR(0.0)
 
 
-@lru_cache(maxsize=1)
-def _track_camera_frame() -> TrackCameraFrame:
-    bounds = track_bounds(points=sampled_track_centerline(samples_per_segment=10), margin=TRACK_CAMERA_MARGIN)
+@lru_cache(maxsize=16)
+def _track_camera_frame(points: tuple[TrackPoint, ...] | None = None) -> TrackCameraFrame:
+    frame_points = sampled_track_centerline(samples_per_segment=10) if points is None else points
+    bounds = track_bounds(points=frame_points, margin=TRACK_CAMERA_MARGIN)
     center_x = (bounds.min_x + bounds.max_x) / 2
     center_z = (bounds.min_z + bounds.max_z) / 2
     return TrackCameraFrame(center_x=center_x, center_z=center_z, width=bounds.width, length=bounds.length)

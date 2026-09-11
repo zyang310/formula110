@@ -158,7 +158,7 @@ def default_track_progress_model() -> TrackProgressModel:
     return track_progress_model_for_layout(TRACK_ID_MUGELLO_SHORT)
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=16)
 def track_progress_model_for_layout(track_id: str) -> TrackProgressModel:
     """Build lap-progress lookup data for one named track layout."""
     layout = track_layout_by_id(track_id)
@@ -294,11 +294,20 @@ def _rebased_track_points_at_distance(model: TrackProgressModel, progress_distan
     if len(model.points) < 3:
         raise ValueError("a track progress model needs at least three points")
     segment_index, _, _ = _segment_at_distance(model=model, progress_distance_m=progress_distance_m)
-    return (
+    rebased_points = (
         track_pose_at_distance(model, progress_distance_m).position,
         *model.points[segment_index + 1 :],
         *model.points[: segment_index + 1],
     )
+    if (
+        hypot(
+            rebased_points[-1].x - rebased_points[0].x,
+            rebased_points[-1].z - rebased_points[0].z,
+        )
+        <= 1e-9
+    ):
+        return rebased_points[:-1]
+    return rebased_points
 
 
 def _segment_at_distance(model: TrackProgressModel, progress_distance_m: float) -> tuple[int, float, float]:
