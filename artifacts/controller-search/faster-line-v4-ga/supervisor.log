@@ -1,0 +1,7 @@
+13:04:47 supervisor up; adopting the running search at generation 17
+13:10:18 degraded at generation 18 (last gap 352s, stale 1s); restarting
+13:10:26 started (generation 18 of 100)
+13:31:59 degraded at generation 36 (last gap 239s, stale 3s); restarting
+13:32:07 started (generation 36 of 100)
+13:58:10 degraded at generation 57 (last gap 241s, stale 22s); restarting
+13:58:18 started (generation 57 of 100)

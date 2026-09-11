@@ -1,0 +1,147 @@
+{
+  "wins": 17,
+  "ties": 1,
+  "losses": 2,
+  "races": [
+    {
+      "seed": 42,
+      "role": "challenger",
+      "outcome": "loss",
+      "race_faster_m": 225.9937154694018,
+      "minimum_viable_m": 280.71912320560324
+    },
+    {
+      "seed": 42,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 453.4308440070155,
+      "minimum_viable_m": 286.06010623752593
+    },
+    {
+      "seed": 110,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 391.27827553171454,
+      "minimum_viable_m": 279.02839228753896
+    },
+    {
+      "seed": 110,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 616.6362462113278,
+      "minimum_viable_m": 280.13466553340606
+    },
+    {
+      "seed": 271,
+      "role": "challenger",
+      "outcome": "loss",
+      "race_faster_m": 227.2374978650405,
+      "minimum_viable_m": 263.9291818759687
+    },
+    {
+      "seed": 271,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 527.2286984683175,
+      "minimum_viable_m": 268.0643956450702
+    },
+    {
+      "seed": 997,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 368.2489613275917,
+      "minimum_viable_m": 274.9112489581367
+    },
+    {
+      "seed": 997,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 448.52053900472663,
+      "minimum_viable_m": 274.38237241531
+    },
+    {
+      "seed": 2027,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 425.2561261107844,
+      "minimum_viable_m": 260.86424634424685
+    },
+    {
+      "seed": 2027,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 481.70392840310376,
+      "minimum_viable_m": 280.18152484930596
+    },
+    {
+      "seed": 82361,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 598.8866762547062,
+      "minimum_viable_m": 265.617500552923
+    },
+    {
+      "seed": 82361,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 402.8854758830702,
+      "minimum_viable_m": 225.8625049104088
+    },
+    {
+      "seed": 16872,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 627.5619117576753,
+      "minimum_viable_m": 281.58368669776496
+    },
+    {
+      "seed": 16872,
+      "role": "incumbent",
+      "outcome": "tie",
+      "race_faster_m": 285.04214761467165,
+      "minimum_viable_m": 285.61959211712394
+    },
+    {
+      "seed": 41256,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 501.14768109446663,
+      "minimum_viable_m": 267.2714114754888
+    },
+    {
+      "seed": 41256,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 343.37794579956665,
+      "minimum_viable_m": 268.58023739795044
+    },
+    {
+      "seed": 8681,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 449.88128291490887,
+      "minimum_viable_m": 265.5153533133568
+    },
+    {
+      "seed": 8681,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 318.49511404854223,
+      "minimum_viable_m": 275.88512966741473
+    },
+    {
+      "seed": 60604,
+      "role": "challenger",
+      "outcome": "WIN",
+      "race_faster_m": 592.77687724989,
+      "minimum_viable_m": 266.4831802778945
+    },
+    {
+      "seed": 60604,
+      "role": "incumbent",
+      "outcome": "WIN",
+      "race_faster_m": 444.6163096522597,
+      "minimum_viable_m": 273.550043750435
+    }
+  ]
+}

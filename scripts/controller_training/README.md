@@ -1,7 +1,8 @@
 # Controller training runbook
 
 Commands for tuning, monitoring, baking, and gating the preview controller
-presets. Everything here writes to the git-ignored `artifacts/` tree; shipped
+presets. Everything here writes to the `artifacts/` tree (checkpoints are
+committed; `*.jsonl` traces are git-ignored); shipped
 parameters are always formatted through `scripts.controller_training.bake`,
 then baked into `src/controllers/`; runtime code never reads `artifacts/`.
 
@@ -1384,5 +1385,7 @@ artifacts/controller-search/
     *.json                        suite records you saved with --output
 ```
 
-`artifacts/` is git-ignored. Deleting a preset directory discards that run's
-history, so keep it until the parameters are baked and gated.
+Checkpoints under `artifacts/controller-search/` are committed (the
+presentation in `presentation/` is built from them); `*.jsonl` traces and the
+rest of `artifacts/` are git-ignored. Deleting a preset directory discards that
+run's history, so keep it until the parameters are baked and gated.

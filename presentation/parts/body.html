@@ -1,0 +1,304 @@
+<div id="deck">
+<div id="stage">
+
+<section class="slide" id="s-title" data-when="all" data-steps="0">
+  <div class="frame title-frame">
+    <div class="stack title-copy">
+      <div class="lab">COMP 590H · Formula 110 · Final presentation</div>
+      <h1>The 7.19&#8209;second lap</h1>
+      <p class="lead">How a reactive controller, a genetic algorithm, two AI agents and ten seconds of human driving took our car from a single <span class="num">28</span>-second lap to a <span class="num c-yellow">7.19 s</span> best lap.</p>
+      <p class="names">Lucas &amp; Zhi</p>
+      <p class="small">→ or space to advance · N speaker notes · F full screen</p>
+    </div>
+    <div class="viz title-viz">
+      <svg id="title-svg" role="img" aria-label="The Formula 110 track with two cars replaying real 30-second runs from seed 110"></svg>
+      <div id="title-read" class="readouts"></div>
+    </div>
+  </div>
+  <aside class="notes"><p>Open on the race itself: both cars are real 30-second simulator runs from seed 110. Grey is our safe baseline, yellow is the controller we shipped. Same start, same physics.</p><p>One sentence of thesis: the lap got faster because two loops worked together — a search loop on the laptop and a conversation loop with AI agents — and the biggest late jump came from us playing the game by hand.</p></aside>
+</section>
+
+<section class="slide" id="s-task" data-when="08-26 12:00|08-27 23:00" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">The problem</div><h2>One function, called sixty times a second</h2><span class="when">Aug 26–27 · reading the repo</span></header>
+    <div class="grid g-5-7">
+      <div class="stack">
+        <div class="eq"><i>f</i> : sensors → (throttle, steer)</div>
+        <ul class="pts">
+          <li class="up" data-s="1"><b>Camera</b>: where the centre line sits <span class="num">4</span>, <span class="num">9</span> and <span class="num">16</span> m ahead — lateral offsets <i>c</i><sub>0</sub>, <i>c</i><sub>1</sub>, <i>c</i><sub>2</sub> — plus heading error.</li>
+          <li class="up" data-s="2"><b>LiDAR</b>: distances to walls and cars. <b>IMU</b>: yaw rate. <b>Odometry</b>: speed.</li>
+          <li class="up" data-s="3"><b>Output</b>: throttle ∈ [−1, 1] and steer ∈ [−1, 1], every 1/60 s.</li>
+        </ul>
+        <div class="spacer"></div>
+        <p class="small up" data-s="3">Score: survive 30 s, then laps, then speed. Every seed spawns the car somewhere different on the 181.1 m lap. CPU only, ≤ 512 MiB.</p>
+      </div>
+      <div class="viz"><svg id="task-svg" role="img" aria-label="Diagram of the car, the three camera lookahead points and LiDAR rays"></svg></div>
+    </div>
+  </div>
+  <aside class="notes"><p>The controller never sees its position on the map. It sees geometry relative to itself: where the centre line is at three distances ahead, wall distances, speed, yaw rate.</p><p>That matters for everything later: a controller that reacts to local geometry works from any spawn point, which is exactly what random seeds test.</p></aside>
+</section>
+
+<section class="slide" id="s-approaches" data-when="08-28 12:00|08-30 23:30" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Approaches</div><h2>Two ways to learn a lap</h2><span class="when">Aug 28–30 · split on Aug 28</span></header>
+    <div class="grid g-2">
+      <div class="stack up" data-s="1">
+        <div class="who c-teal">Lucas · alternative</div>
+        <h3>Memorize the track</h3>
+        <div class="viz" style="height:calc(15*var(--u))"><svg id="appr-a" role="img" aria-label="The lap split into sectors, each with its own tape of actions"></svg></div>
+        <p class="small" style="color:var(--ink2)">Offline, privileged cross-entropy search over open-loop throttle/steer sequences; then split the lap into sectors and learn the best behaviour for each.</p>
+        <ul class="pts small"><li>Initial training reached about one lap in 30 s.</li><li>A multi-hour run exhausted memory and crashed the laptop.</li><li>A tape of actions fits one track and one starting pose.</li></ul>
+        <div class="up" data-s="3"><span class="st no">Abandoned Aug 30</span></div>
+      </div>
+      <div class="stack up" data-s="2">
+        <div class="who c-blue">Zhi · primary</div>
+        <h3>Tune a reflex</h3>
+        <div class="viz" style="height:calc(15*var(--u))"><svg id="appr-b" role="img" aria-label="A controller function with tunable parameter knobs driven by a search loop"></svg></div>
+        <p class="small" style="color:var(--ink2)">A hand-built reactive controller reads the road ahead every tick. Speeds, gains and distances set its behaviour; a CEM, then a genetic algorithm, tunes them across many random starts.</p>
+        <ul class="pts small"><li>Works from any start: it never needs to know where it is.</li><li>The safe baseline was clean on 14 of 14 seeds before any tuning.</li><li>Every candidate is raced on 28–33 seeds.</li></ul>
+        <div class="up" data-s="3"><span class="st ok">Selected — everything after this builds on it</span></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>Lucas: explain the tape idea. It optimizes actions directly, which is powerful on one fixed track, but memory grew with every position and the result would not transfer to a new start or track. That, plus the crash, is why we stopped it on Aug 30.</p><p>Zhi: the reflex idea. The policy is interpretable — every parameter is a speed, a distance, a gain — so search can tune it cheaply and we can read what it learned. Our very first plan (Aug 26) was imitation learning; we never built it, but the human recording returns later.</p></aside>
+</section>
+
+<section class="slide" id="s-controller" data-when="08-28 12:00|08-31 23:59" data-steps="4">
+  <div class="frame">
+    <header class="sh"><div class="lab">Primary approach</div><h2>How the controller drives</h2><span class="when"><code>controllers.race_faster</code> · v27</span></header>
+    <div class="grid g-7-5">
+      <div class="stack tight">
+        <div class="viz" style="flex:1"><svg id="ctrl-svg" role="img" aria-label="One lap of the final controller on seed 110, coloured by speed, against the centre line"></svg></div>
+        <div class="legend up" data-s="3" id="ctrl-legend"></div>
+      </div>
+      <div class="stage-list">
+        <div class="row up" data-s="1"><span class="k">1</span><div><h3>Read the road</h3><p>Turn the three camera offsets into the local curvature <i>κ</i> ahead — near and far.</p></div></div>
+        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Outside → inside → outside: a target up to 3.1 m off centre, blended by corner phase (entry, apex, exit).</p></div></div>
+        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>25.1 m/s on straights, 13.7 m/s in corners. Above target it <em>coasts</em>; it never brakes just to slow down.</p></div></div>
+        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Stay alive — plus three tricks</h3><p>NORMAL → AVOID → RECOVER near walls. Event moves: a launch cap, a sweeper boost, and a 0.15 s brake-turn drift after the long corridor.</p></div></div>
+        <p class="small up" data-s="4"><code>ControllerParameters</code> has 116 named fields; each search version tuned 1–20 of them.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
+</section>
+
+<section class="slide" id="s-eval" data-when="08-28 12:00|09-01 23:59" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evaluation</div><h2>How we decided one controller beat another</h2><span class="when">fixed on Aug 28, never re-drawn</span></header>
+    <div class="grid g-2">
+      <div class="stack tight">
+        <div class="viz" style="flex:1"><svg id="eval-seeds" role="img" aria-label="147 seeds grouped into official, training, validation, live grading and soak suites"></svg></div>
+        <p class="small up" data-s="3">Our evaluator replays the Gradescope worker's tick order; a parity trial matched it on all 11 grading metrics.</p>
+      </div>
+      <div class="stack">
+        <div class="up" data-s="2"><div class="lab" style="margin-bottom:.6em">Ranking — the first difference wins</div>
+          <ol class="pts small" style="color:var(--ink2)">
+            <li>Survived all 30 s</li>
+            <li>Completed a lap</li>
+            <li>Inside the incident budget: ≤ 0.25 damage, ≤ 1.5 s wall contact</li>
+            <li>Completed three laps, then fully clean</li>
+            <li>Best lap — worst seed, then p90, median, mean, counted in whole 1/60 s ticks</li>
+            <li>First lap, then distance</li>
+          </ol></div>
+        <div class="up" data-s="3"><div class="lab" style="margin-bottom:.6em">Promotion gates</div>
+          <ul class="pts small" style="color:var(--ink2)">
+            <li>12 untouched validation seeds, all clean</li>
+            <li>100 fresh soak seeds, zero eliminations</li>
+            <li>≥ 12 of 20 role-swapped head-to-head races against <code>minimum_viable</code></li>
+          </ul></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>The optimizer only ever ranked candidates on training seeds (plus the two official seeds from v10, and the five live grading seeds from v26). Validation and soak seeds stayed untouched until a candidate asked to be promoted.</p><p>The ranking is lexicographic: safety tiers first, lap time only among equally safe candidates. We rewrote the lap-time part ten times — the surprises slide explains why.</p></aside>
+</section>
+
+<section class="slide" id="s-loops" data-when="all" data-steps="2">
+  <div class="frame">
+    <header class="sh"><div class="lab">Development strategy</div><h2>Two loops: the laptop and the chat</h2><span class="when">Aug 26 – Sep 2</span></header>
+    <div class="grid g-5-7">
+      <div class="viz"><svg id="loops-svg" role="img" aria-label="An inner search loop nested inside an outer conversation loop"></svg></div>
+      <div class="stack">
+        <div class="up" data-s="0"><div class="lab c-blue" style="margin-bottom:.35em">Inner loop · genetic algorithm</div>
+          <p class="small" style="color:var(--ink2)">Sample 16–64 candidates → race each on 6–11 seeds → re-race the elites on 28–33 → cross over, mutate. About a minute per generation, run from Zhi's terminal: <span class="num">771</span> generations, <span class="num">≈ 570,000</span> races, zero tokens.</p></div>
+        <div class="up" data-s="1"><div class="lab c-yellow" style="margin-bottom:.35em">Outer loop · a chat with an agent</div>
+          <p class="small" style="color:var(--ink2)">Question → hypothesis → a new behaviour behind a default-off flag, with tests → launch a search → read the checkpoints → promote or reject → one row in the decision log. <span class="num">20</span> conversations, <span class="num">30</span> search versions, <span class="num">52</span> logged decisions. Each chat is a generation of this loop.</p></div>
+        <div class="up" data-s="2"><div class="lab" style="margin-bottom:.45em">Who did what</div>
+          <ul class="pts small" style="color:var(--ink2)">
+            <li><b>Zhi</b> framed the questions, drove the human laps, launched every search and reviewed traces.</li>
+            <li><b>Lucas</b> built and stress-tested the pre-training alternative and called its stop.</li>
+            <li><b>Together</b>: split the approaches on Aug 28, compared results, kept lab notes.</li>
+            <li><b>Codex</b> (and <b>Claude Code</b>) wrote the controller, search tooling, tests and traces, diagnosed bugs, and kept <code>plan.md</code>.</li>
+          </ul></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
+</section>
+
+<section class="slide" id="s-journey" data-when="all" data-steps="9">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evidence</div><h2>Lap time, one chat at a time</h2><span class="when" id="jr-when">Aug 26 – Sep 2</span></header>
+    <div class="grid g-8-4">
+      <div class="chart-col">
+        <div class="btns" role="group" aria-label="Horizontal axis">
+          <span class="small" style="margin-right:.3em">x-axis</span>
+          <button type="button" id="jr-x-tok" aria-pressed="true">Agent tokens</button>
+          <button type="button" id="jr-x-time" aria-pressed="false">Calendar time</button>
+          <button type="button" id="jr-x-trials" aria-pressed="false">Simulated races</button>
+        </div>
+        <div class="viz"><svg id="jr-svg" role="img" aria-label="Best lap time falling from 28.2 to 7.18 seconds, plotted against agent tokens, calendar time or simulated races"></svg></div>
+      </div>
+      <div id="jr-panel" aria-live="polite"></div>
+    </div>
+  </div>
+  <aside class="notes"><p>Step through the beats. Each shaded band on the axis is one conversation with an agent (blue Codex, purple Claude Code). Brown diamonds are moments where one of us asked a question that changed direction.</p><p>Then flip the x-axis: against calendar time the search looks steady; against simulated races the big early drops were cheap and the last 0.4 s came after half a million races; against tokens you can see which conversations paid.</p></aside>
+</section>
+
+<section class="slide" id="s-search" data-when="08-28 20:00|08-30 23:30" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evidence · inside the search</div><h2>Why we swapped CEM for a genetic algorithm</h2><span class="when">real populations from our checkpoints</span></header>
+    <div class="grid g-2">
+      <div class="stack tight">
+        <div class="lab">Cross-entropy method · v2 gate, 10 generations</div>
+        <div class="viz" style="flex:1"><svg id="cem-svg" role="img" aria-label="CEM sampling ellipses shrinking onto a bound over ten generations"></svg></div>
+        <p class="small up" data-s="3" style="color:var(--ink2)">The sampling distribution shrinks every generation — σ fell 7× in ten — and cannot grow back. It settled on a floor with the racing line almost off (entry offset 0.055).</p>
+      </div>
+      <div class="stack tight">
+        <div class="lab">Genetic algorithm · v19, 16 generations</div>
+        <div class="viz" style="flex:1"><svg id="ga-svg" role="img" aria-label="GA population of 48 walking out of the previous parameter box"></svg></div>
+        <p class="small up" data-s="3" style="color:var(--ink2)">A population keeps its spread. We reopened two bounds v13's elites were pinned against, and the population walked out of the old box: the winner lives outside it.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>Left: CEM keeps a Gaussian over parameters and refits it to the elites. Watch the ellipse collapse — once it is narrow it can't explore again.</p><p>Right: the GA keeps 48 individual candidates, crosses and mutates them. The dashed box is where v13 allowed these two genes; its elites sat on the box's edge, which told us the box — not the controller — was the limit. Reopened in v19, the winner landed at 13.74 m/s and 2.04 m.</p></aside>
+</section>
+
+<section class="slide" id="s-curv" data-when="08-28 18:30|08-28 23:59" data-steps="4">
+  <div class="frame">
+    <header class="sh"><div class="lab">Failure that changed our approach</div><h2>The optimizer was right. Our curvature was wrong.</h2><span class="when">Aug 28 · the CEM gate</span></header>
+    <div class="grid g-5-7">
+      <div class="viz"><svg id="curv-svg" role="img" aria-label="A curve of radius R with lookahead points at 4, 9 and 16 metres"></svg></div>
+      <div class="stack">
+        <div class="up" data-s="2"><div class="eq-sm"><span class="c-red"><i>c</i>/<i>d</i></span> ≈ <i>d</i>/2<i>R</i></div><p class="small">What we used: offset divided by distance. It grows with <i>d</i> in every corner, so the far point always looked sharpest.</p></div>
+        <div class="up" data-s="3"><div class="eq-sm"><span class="c-green"><i>κ</i></span> ≈ Δslope / Δ<i>d</i> = 1/<i>R</i></div><p class="small">The fix: difference the segment slopes. Same answer at every distance — and the car's own pose cancels out.</p></div>
+        <div class="viz up" data-s="2" style="flex:1;min-height:calc(12*var(--u))"><svg id="curv-bars" role="img" aria-label="Bar comparison of c over d versus slope-difference curvature"></svg></div>
+        <p class="small up" data-s="4" style="color:var(--ink2)">The broken signal put 84.6% of corner weight on “entry” and 7.8% on “apex”. The CEM responded rationally — it switched the racing line off. We fixed the sensor model, not the search.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>For a turn of radius R, the centre line's sideways offset at distance d grows like d²/2R. Dividing by d still leaves d/2R — it rises with distance even though the curve is constant.</p><p>Second differences kill both the constant (lateral offset) and the linear term (heading error), leaving 1/R. After the fix the GA's first ten generations went from 10 s to 9.4 s.</p></aside>
+</section>
+
+<section class="slide" id="s-surprises" data-when="08-28 12:00|09-01 23:59" data-steps="5">
+  <div class="frame">
+    <header class="sh"><div class="lab">Failures &amp; surprises</div><h2>Six surprises that changed our direction</h2><span class="when">from the 52-row decision log</span></header>
+    <div class="tscroll">
+      <table class="t">
+        <thead><tr><th>When</th><th>What surprised us</th><th>What we changed</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr data-s="0"><td class="when-c">Aug 28</td><td>One negative-throttle tick latches the drivetrain: engine force stays at zero until the car nearly stops — a ≈ 50 : 1 loss.</td><td>Coast (throttle 0) instead of braking in normal driving.</td><td><span class="st ok">+24% distance, a second lap</span></td></tr>
+          <tr data-s="1"><td class="when-c">Aug 28</td><td><i>c</i>/<i>d</i> isn't curvature; the CEM “collapsed” for a good reason.</td><td>Local curvature from slope differences; CEM → GA.</td><td><span class="st ok">9.57 → 9.00 s</span></td></tr>
+          <tr data-s="2"><td class="when-c">Aug 29–30</td><td>The score gets gamed: v8 crashed, recovered, then sprinted one 7.80 s lap; 5×10<sup>−15</sup> s of float noise decided a ranking; rounding split equal totals.</td><td>Count laps in integer ticks; three-lap and clean tiers before speed; best lap first.</td><td><span class="st ok">Only clean runs promoted</span></td></tr>
+          <tr data-s="3"><td class="when-c">Aug 30</td><td>All 30 seeds hit exactly 457 ticks (7.617 s). Re-ranking, a new lever, a wider launch box and the whole speed profile each moved nothing in 10+ generations.</td><td>Stop after 10 flat generations; reopen pinned bounds before inventing levers.</td><td><span class="st hold">A floor of the policy, not the search</span></td></tr>
+          <tr data-s="4"><td class="when-c">Aug 31</td><td>Ten seconds of human driving used a brake-turn drift the search had never been allowed to try.</td><td>Corridor boost + a short drift pulse, tuned by the GA.</td><td><span class="st ok">7.60 → 7.19 s, clean on 33 seeds</span></td></tr>
+          <tr data-s="5"><td class="when-c">Sep 1</td><td>Copying the human's sequence exactly (v29, v30) was safe — and slower.</td><td>Kept v27; archived v30 as a reproducible experiment.</td><td><span class="st no">+0.068 s mean best lap</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <aside class="notes"><p>If there is time for only one: row four. When every seed produced the identical 457-tick lap, more search was pointless — the controller's structure was the limit. That is what sent us back to the simulator to drive by hand.</p><p>Laptop surprise not on the table: each search worker held ~950 MB; runs slowed into swap and the MacBook thermally slept mid-run. We restarted searches every ten generations from checkpoints.</p></aside>
+</section>
+
+<section class="slide" id="s-race" data-when="08-31 12:00|09-01 23:59" data-steps="0">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evidence · representative race</div><h2>Seed 110, raced three ways</h2><span class="when">real simulator trajectories</span></header>
+    <div class="stack tight">
+      <div class="viz" style="flex:1"><svg id="race-svg" role="img" aria-label="Three cars replaying seed 110: baseline, human replay, and the final controller"></svg><div id="race-read" class="readouts"></div></div>
+      <div class="viz" style="height:calc(8.2*var(--u))"><svg id="race-strip" role="img" aria-label="Throttle traces for the final controller and the human driver"></svg></div>
+      <div class="btns">
+        <button type="button" id="race-play" aria-pressed="false">Pause</button>
+        <button type="button" id="race-restart">Restart</button>
+        <button type="button" id="race-sp-05" aria-pressed="false">½×</button>
+        <button type="button" id="race-sp-1" aria-pressed="true">1×</button>
+        <button type="button" id="race-sp-2" aria-pressed="false">2×</button>
+        <label class="small" for="race-scrub" style="margin-left:.6em">time</label>
+        <input type="range" id="race-scrub" min="0" max="30" step="0.05" value="0" style="flex:1;min-width:8em">
+        <span class="small num" id="race-t" style="min-width:4.5em;text-align:right">0.0 s</span>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27's drift pulse is five ticks long. The throttle strip shows it — v27 dips below zero for a blink, the human holds the brake.</p></aside>
+</section>
+
+<section class="slide" id="s-results" data-when="08-31 12:00|09-02 23:59" data-steps="0">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evidence · final results</div><h2>What we shipped, and what we didn't</h2><span class="when">lap times are means over the listed seeds</span></header>
+    <div class="stack">
+      <div class="tscroll">
+        <table class="t">
+          <thead><tr><th>Controller</th><th>Promoted</th><th class="n">Best lap</th><th class="n">First lap</th><th>Seeds &amp; cleanliness</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><code>minimum_viable</code></td><td class="when-c">Aug 28</td><td class="n">19.50 s</td><td class="n">—</td><td>seed 110 · 14/14 clean at promotion</td><td><span class="st ok">safe submission</span></td></tr>
+            <tr><td>GA plateau · v19</td><td class="when-c">Aug 30</td><td class="n">7.617 s</td><td class="n">8.45 s</td><td>30/30 clean · soak 100/100 · head-to-head 19/20</td><td><span class="st ok">promoted</span></td></tr>
+            <tr><td>Corridor boost · v25</td><td class="when-c">Aug 31</td><td class="n">7.594 s</td><td class="n">8.43 s</td><td>30/30 clean · soak 100/100 clean</td><td><span class="st ok">promoted</span></td></tr>
+            <tr class="hl"><td><code>race_faster</code> · v27</td><td class="when-c">Aug 31</td><td class="n key">7.190 s</td><td class="n">8.160 s</td><td>5/5 live grading seeds clean · 33/33 search · soak 100/100 survived, 91 clean</td><td><span class="st hold">final controller</span></td></tr>
+            <tr><td>Human sequence · v30</td><td class="when-c">Sep 1</td><td class="n">7.256 s</td><td class="n">8.255 s</td><td>33/33 clean</td><td><span class="st no">not promoted</span></td></tr>
+            <tr><td><code>race_speedmax</code> · v26</td><td class="when-c">Aug 31</td><td class="n">—</td><td class="n">—</td><td>peak 36.4 m/s · damage 0.15–0.76 accepted</td><td><span class="st no">speed experiment</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="board">
+        <span class="lab">Leaderboard</span><span class="lead">Final placement: <span class="fill-in">rank __ of __</span></span>
+        <span class="lab">Sources</span><span class="small">search checkpoints, <code>faster-line-v27-gate/soak.json</code>, the Gradescope worker on seeds 110, 2026, 1893, 7656, 9340, and <code>scripts/controller_training/README.md</code>.</span>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>Point to the highlighted row: 7.190 s mean best lap and 8.160 s mean first lap on the five live grading seeds, every run clean, 3–4 laps each. On the 100-seed soak all survived; nine had small contact (0.48 s total).</p><p>Say the leaderboard placement here.</p></aside>
+</section>
+
+<section class="slide" id="s-learned" data-when="all" data-steps="2">
+  <div class="frame">
+    <header class="sh"><div class="lab">Learning</div><h2>Optimize the training, or optimize the model?</h2><span class="when">where the 21 seconds came from</span></header>
+    <div class="grid g-7-5">
+      <div class="stack tight">
+        <div class="viz" style="flex:1"><svg id="learned-bars" role="img" aria-label="Seconds gained by search versus by new controller structure, in three phases"></svg></div>
+        <p class="small">Each promoted version is classed by what was new in it. Structural versions were still tuned by the GA.</p>
+      </div>
+      <div class="stack">
+        <ul class="pts small up" data-s="1" style="color:var(--ink2)">
+          <li><b>Search harvests slack; structure moves floors.</b> Search alone took the safe car from 28 to 15.5 s. Below 7.9 s, 84% of the gain came from new behaviour.</li>
+          <li><b>The objective is the specification.</b> Every loophole in our ranking was found and exploited.</li>
+          <li><b>Robustness is designed.</b> Held-out seeds, default-off levers and clean promotion gates — never one lucky run.</li>
+          <li><b>Follow curiosity.</b> Both biggest structural wins — coasting and drifting — began as a human “why?”.</li>
+        </ul>
+        <blockquote class="q up" data-s="2">If this isn't a model that is trained, is this just being brute-forced and reasoned via an agent loop?<cite>— Zhi, to Claude Code, Aug 31</cite></blockquote>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>This is our main learning. "Optimizing the training" — better optimizer, better objective, wider bounds — was worth a lot early and nothing at the plateau. "Optimizing the model" — adding a behaviour the policy could express — was what moved the floor.</p><p>The quote is honest: our controller is a hand-structured policy whose numbers were learned. A neural policy would learn the structure too, but would need far more data; that trade-off is the next slide's question.</p></aside>
+</section>
+
+<section class="slide" id="s-question" data-when="all" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Open question</div><h2>Is Codex a more efficient learner than traditional ML?</h2><span class="when">three learners, three currencies</span></header>
+    <div class="stack" style="gap:calc(2.2*var(--u))">
+      <div class="ledger">
+        <div class="up" data-s="0"><div class="lab c-blue">Genetic algorithm</div><div class="hero-n">570,000</div><div class="hero-u">30-second races · ≈ 198 days of simulated driving</div><p>Learned values for 1–20 numbers at a time. Refined every structure it was handed, then flat-lined at 457 ticks.</p></div>
+        <div class="up" data-s="1"><div class="lab c-yellow">AI agents</div><div class="hero-n">504 M</div><div class="hero-u">tokens processed · 15.9 M fresh · 2.0 M written</div><p>Learned hypotheses: 30 search spaces, 10 rewrites of the ranking, one geometry bug, 12 new behaviours (3 rejected). Could not judge any idea without the simulator.</p></div>
+        <div class="up" data-s="2"><div class="lab c-brown">Human</div><div class="hero-n">10.4 s</div><div class="hero-u">of driving · 626 ticks · a handful of questions</div><p>Learned a prior: brake to rotate, never brake to slow. It seeded the 0.41 s drift — the largest late gain.</p></div>
+      </div>
+      <p class="lead up" data-s="3" style="max-width:60em">Our tentative answer: they learn in different spaces. The GA searches parameters, the agent searches structure and objectives, and the human supplies priors. Per sample the human wins; per hour, the agent; for the last hundredth, the GA. None reached 7.19 s alone.</p>
+    </div>
+  </div>
+  <aside class="notes"><p>Frame it as a question for the room, not a verdict. The units differ on purpose: races, tokens, seconds of driving. Note that 97% of the agent tokens were the conversation re-reading itself (cache), so "fresh" tokens are the fairer comparison.</p><p>Discussion prompt: what would it take for an agent to generate its own "human laps" — to play the game rather than read about it?</p></aside>
+</section>
+
+</div>
+<nav id="ribbon" aria-label="Slide navigation and project timeline">
+  <div class="btns"><button type="button" id="rb-prev" aria-label="Previous">←</button><button type="button" id="rb-next" aria-label="Next">→</button></div>
+  <svg id="rb-svg" role="img" aria-label="Project timeline from Aug 26 to Sep 2 with the current slide's moment highlighted"></svg>
+  <div class="btns"><span id="rb-count"></span><button type="button" id="rb-notes" aria-pressed="false">Notes</button></div>
+</nav>
+</div>
+<div id="notes" hidden><div class="lab" id="notes-title">Speaker notes</div><div id="notes-body"></div></div>

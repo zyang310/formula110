@@ -124,7 +124,9 @@ touched paths and report remaining baseline failures.
   controller dependencies from `pyproject.toml` or `uv.lock`.
 - `scripts/export_student_controllers.py` follows static `controllers.*`
   imports. Dynamic imports and non-Python assets require `--all-controllers`.
-- `artifacts/` is ignored output. Audio-processing scripts overwrite tracked
-  WAVs by default; update `src/racing/assets/audio/THIRD_PARTY_AUDIO.md` when
-  audio changes.
+- `artifacts/` is ignored output, except the search checkpoints under
+  `artifacts/controller-search/` (their `*.jsonl` traces stay ignored) and
+  `artifacts/human-driving.jsonl`, which `presentation/` is built from.
+  Audio-processing scripts overwrite tracked WAVs by default; update
+  `src/racing/assets/audio/THIRD_PARTY_AUDIO.md` when audio changes.
 - Commit both `pyproject.toml` and `uv.lock` when dependencies change.

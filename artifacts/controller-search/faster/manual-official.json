@@ -1,0 +1,59 @@
+{
+  "duration_seconds": 30.0,
+  "module": "controllers.race_faster",
+  "record_type": "solo_trial_suite",
+  "results": [
+    {
+      "best_lap_time_seconds": 19.90000000000015,
+      "damage": 0.0,
+      "elapsed_seconds": 30.0,
+      "first_lap_time_seconds": 19.90000000000015,
+      "lap_count": 1,
+      "max_speed_mps": 14.538714090983072,
+      "ok": true,
+      "partial_laps": 1.5243927220615854,
+      "raw_distance_m": 279.06445066522053,
+      "record_type": "solo_trial_result",
+      "schema_version": 1,
+      "seed": 110,
+      "survived": true,
+      "wall_contact_seconds": 0.0
+    },
+    {
+      "best_lap_time_seconds": 19.83333333333349,
+      "damage": 0.0,
+      "elapsed_seconds": 30.0,
+      "first_lap_time_seconds": 19.83333333333349,
+      "lap_count": 1,
+      "max_speed_mps": 14.538835949367947,
+      "ok": true,
+      "partial_laps": 1.5389873809992638,
+      "raw_distance_m": 281.73623623605516,
+      "record_type": "solo_trial_result",
+      "schema_version": 1,
+      "seed": 2026,
+      "survived": true,
+      "wall_contact_seconds": 0.0
+    }
+  ],
+  "schema_version": 1,
+  "seeds": [
+    110,
+    2026
+  ],
+  "summary": {
+    "clean_count": 2,
+    "damage_trial_count": 0,
+    "lap_count": 2,
+    "maximum_speed_mps": 14.538835949367947,
+    "mean_distance_m": 280.4003434506378,
+    "median_distance_m": 280.4003434506378,
+    "survival_count": 2,
+    "tenth_percentile_distance_m": 279.331629222304,
+    "total_wall_contact_seconds": 0.0,
+    "trial_count": 2,
+    "wall_contact_trial_count": 0,
+    "worst_damage": 0.0,
+    "worst_distance_m": 279.06445066522053
+  }
+}
