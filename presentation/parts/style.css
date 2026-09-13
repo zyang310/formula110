@@ -33,11 +33,11 @@ code,.tt{font-family:var(--mono);font-size:.92em;color:var(--ink2)}
 .sh .when{font-style:italic;color:var(--mute);font-size:var(--t-small);white-space:nowrap}
 .lab{font-size:var(--t-lab);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 .sh .sh-lead{grid-column:1/-1;font-size:var(--t-body);color:var(--ink2);max-width:58em;margin-top:calc(.35*var(--u))}
-.terms{font-size:var(--t-lab);color:var(--mute);border-top:1px solid var(--line);padding-top:calc(.55*var(--u));margin-top:calc(.5*var(--u));line-height:1.5}
+.terms{font-size:max(13.5px,calc(1.26*var(--u)));color:var(--mute);border-top:1px solid var(--line);padding-top:calc(.62*var(--u));margin-top:calc(.55*var(--u));line-height:1.45}
 .closing{border-top:1px solid var(--line2);padding-top:calc(.9*var(--u));margin-top:calc(.7*var(--u));display:flex;gap:calc(2.4*var(--u));align-items:baseline;flex-wrap:wrap}
 .closing .stat{font-size:calc(1.75*var(--u));color:var(--ink);font-variant-numeric:lining-nums tabular-nums;white-space:nowrap}
 .closing .q-line{font-size:var(--t-small);color:var(--ink2);flex:1;min-width:20em;line-height:1.4}
-.terms b{color:var(--ink2);font-weight:400}
+.terms b{color:var(--ink);font-weight:400}
 .terms .sep{opacity:.5;padding:0 .5em}
 .gloss p{font-size:var(--t-small);color:var(--ink2);line-height:1.35}
 .gloss b{color:var(--ink);font-weight:400}
