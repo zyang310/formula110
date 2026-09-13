@@ -1,0 +1,188 @@
+<!-- Slides cut from the 10-slide deck, kept verbatim.
+     To put one back: move its <section> into parts/body.html in the order you want,
+     then run python3 presentation/build.py. They are not built from this file. -->
+
+<section class="slide" id="s-question" data-when="all" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Open question</div><h2>Is Codex a more efficient learner than traditional ML?</h2><span class="when">three learners, three currencies</span></header>
+    <div class="stack" style="gap:calc(2.2*var(--u))">
+      <div class="ledger">
+        <div class="up" data-s="0"><div class="lab c-blue">Genetic algorithm</div><div class="hero-n">570,000</div><div class="hero-u">30-second races · ≈ 198 days of simulated driving</div><p>Learned values for 1–20 numbers at a time. Refined every structure it was handed, then flat-lined at 457 ticks.</p></div>
+        <div class="up" data-s="1"><div class="lab c-yellow">AI agents</div><div class="hero-n">504 M</div><div class="hero-u">tokens processed · 15.9 M fresh · 2.0 M written</div><p>Learned hypotheses: 30 search spaces, 10 rewrites of the ranking, one geometry bug, 12 new behaviours (3 rejected). Could not judge any idea without the simulator.</p></div>
+        <div class="up" data-s="2"><div class="lab c-brown">Human</div><div class="hero-n">10.4 s</div><div class="hero-u">of driving · 626 ticks · a handful of questions</div><p>Learned a prior: brake to rotate, never brake to slow. It seeded the 0.41 s drift — the largest late gain.</p></div>
+      </div>
+      <p class="lead up" data-s="3" style="max-width:60em">Our tentative answer: they learn in different spaces. The GA searches parameters, the agent searches structure and objectives, and the human supplies priors. Per sample the human wins; per hour, the agent; for the last hundredth, the GA. None reached 7.19 s alone.</p>
+    </div>
+  </div>
+  <aside class="notes"><p class="cue"><b>0:30 · 3 presses · finish by 5:55</b> — “570,000 races, 504 million tokens, ten seconds of driving. Different currencies — none got there alone.”</p><p>Frame it as a question for the room, not a verdict. The units differ on purpose: races, tokens, seconds of driving. Note that 97% of the agent tokens were the conversation re-reading itself (cache), so "fresh" tokens are the fairer comparison.</p><p>Discussion prompt: what would it take for an agent to generate its own "human laps" — to play the game rather than read about it?</p></aside>
+</section>
+
+<section class="slide" id="s-appendix" data-when="all" data-steps="0">
+  <div class="frame" style="grid-template-rows:minmax(0,1fr)">
+    <div class="stack" style="justify-content:center">
+      <div class="lab">Backup</div>
+      <h2 style="font-size:var(--t-disp);line-height:1">Appendix</h2>
+      <p class="lead" style="max-width:44em">Kept for questions: what the car can see · how we proved a lap wasn't luck · CEM versus the genetic algorithm · the curvature bug that sent us to the GA.</p>
+    </div>
+  </div>
+  <aside class="notes"><p>Skip past this unless someone asks. The four slides behind it are the detail we cut for time.</p></aside>
+</section>
+
+<section class="slide" id="s-glossary" data-when="all" data-steps="0">
+  <div class="frame">
+    <header class="sh"><div class="lab">Appendix</div><h2>The words we used</h2><span class="when">in the order you'd meet them</span></header>
+    <div class="grid g-2 gloss">
+      <div class="stack">
+        <p><b>Seed</b> — a starting point on the lap. The track never changes; the seed only decides where the car begins, so a run is repeatable and a controller has to be good from anywhere. We used 2 official, 28 training, 12 validation, 100 soak and 5 live grading seeds.</p>
+        <p><b>Generation</b> — one round of the search: race every candidate, keep the best, breed the next batch. We ran 771 of them.</p>
+        <p><b>Elite</b> — the best few candidates in a generation, the only ones allowed to breed.</p>
+        <p><b>CEM (cross-entropy method)</b> — keep a bell curve over each number, sample candidates from it, then refit the curve to the winners. It narrows every round and can never widen again, which is why ours stalled.</p>
+        <p><b>Genetic algorithm</b> — keep a crowd of distinct candidates, breed pairs of winners, mutate the children. Slower to settle, but it keeps exploring.</p>
+        <p><b>Bound (or box)</b> — the range a number is allowed to take during a search. When every winner sits exactly on a bound, the box — not the controller — is the limit.</p>
+      </div>
+      <div class="stack">
+        <p><b>Tick</b> — one physics step, 1/60 s ≈ 16.7 ms. Lap times are whole ticks, so we often say “457 ticks” instead of 7.617 s.</p>
+        <p><b>Clean</b> — a run with zero damage and zero wall contact.</p>
+        <p><b>Incident budget</b> — how much damage and contact a candidate may have and still be ranked rather than discarded: 0.25 damage and 1.5 s of contact, later 0.5 and 2.0.</p>
+        <p><b>Soak</b> — the 100-seed endurance run, the last check before shipping.</p>
+        <p><b>Promotion gate</b> — a pass/fail bar on seeds the search never saw: all 12 validation seeds clean, 100 of 100 soak trials survived, ≥ 12 of 20 head-to-head races, and beating the safe baseline on both official seeds. Passing every gate is what “promoted” means.</p>
+        <p><b>Default-off</b> — every new behaviour ships switched off, so the previous controller stays reproducible bit for bit until a search chooses to turn the new one on.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>Here for questions. The five terms that come up most: seed, generation, tick, clean, promotion gate.</p></aside>
+</section>
+
+<section class="slide" id="s-task" data-when="08-26 12:00|08-27 23:00" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">The problem</div><h2>What the car can see</h2><span class="when">Aug 26–27 · reading the repo</span>
+      <p class="sh-lead">Three glimpses of the centre line ahead, a fan of distances to the walls, and its own speed. That is the entire world it gets.</p></header>
+    <div class="grid g-5-7">
+      <div class="stack">
+        <ul class="pts">
+          <li class="up" data-s="1"><b>Camera</b>: where the centre line sits <span class="num">4</span>, <span class="num">9</span> and <span class="num">16</span> m ahead — lateral offsets <i>c</i><sub>0</sub>, <i>c</i><sub>1</sub>, <i>c</i><sub>2</sub> — plus heading error.</li>
+          <li class="up" data-s="2"><b>LiDAR</b>: distances to walls and cars. <b>IMU</b>: yaw rate. <b>Odometry</b>: speed.</li>
+          <li class="up" data-s="3"><b>Output</b>: throttle ∈ [−1, 1] and steer ∈ [−1, 1], every 1/60 s.</li>
+        </ul>
+        <div class="spacer"></div>
+        <p class="small up" data-s="3">Score: survive 30 s, then laps, then speed. Every seed spawns the car somewhere different on the 181.1 m lap. CPU only, ≤ 512 MiB.</p>
+      </div>
+      <div class="viz"><svg id="task-svg" role="img" aria-label="Diagram of the car, the three camera lookahead points and LiDAR rays"></svg></div>
+    </div>
+  </div>
+  <aside class="notes"><p>The controller never sees its position on the map. It sees geometry relative to itself: where the centre line is at three distances ahead, wall distances, speed, yaw rate.</p><p>That matters for everything later: a controller that reacts to local geometry works from any spawn point, which is exactly what random seeds test.</p></aside>
+</section>
+
+<section class="slide" id="s-eval" data-when="08-28 12:00|09-01 23:59" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evaluation</div><h2>Proving a lap wasn’t luck</h2><span class="when">fixed on Aug 28, never re-drawn</span></header>
+    <div class="grid g-2">
+      <div class="stack tight">
+        <div class="viz" style="flex:1"><svg id="eval-seeds" role="img" aria-label="147 seeds grouped into official, training, validation, live grading and soak suites"></svg></div>
+        <p class="small up" data-s="3">Our evaluator replays the Gradescope worker's tick order; a parity trial matched it on all 11 grading metrics.</p>
+      </div>
+      <div class="stack">
+        <div class="up" data-s="2"><div class="lab" style="margin-bottom:.6em">Ranking — the first difference wins</div>
+          <ol class="pts small" style="color:var(--ink2)">
+            <li>Survived all 30 s</li>
+            <li>Completed a lap</li>
+            <li>Inside the incident budget: ≤ 0.25 damage, ≤ 1.5 s wall contact</li>
+            <li>Completed three laps, then fully clean</li>
+            <li>Best lap — worst seed, then p90, median, mean, counted in whole 1/60 s ticks</li>
+            <li>First lap, then distance</li>
+          </ol></div>
+        <div class="up" data-s="3"><div class="lab" style="margin-bottom:.6em">Promotion gates</div>
+          <ul class="pts small" style="color:var(--ink2)">
+            <li>12 untouched validation seeds, all clean</li>
+            <li>100 fresh soak seeds, zero eliminations</li>
+            <li>≥ 12 of 20 role-swapped head-to-head races against <code>minimum_viable</code></li>
+          </ul></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>The optimizer only ever ranked candidates on training seeds (plus the two official seeds from v10, and the five live grading seeds from v26). Validation and soak seeds stayed untouched until a candidate asked to be promoted.</p><p>The ranking is lexicographic: safety tiers first, lap time only among equally safe candidates. We rewrote the lap-time part ten times — the surprises slide explains why.</p></aside>
+</section>
+
+<section class="slide" id="s-search" data-when="08-28 20:00|08-30 23:30" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evidence · inside the search</div><h2>Why we swapped CEM for a genetic algorithm</h2><span class="when">real populations from our checkpoints</span>
+      <p class="sh-lead">Both are guess-and-check with a memory. The CEM keeps one bell curve and narrows it; a genetic algorithm keeps a crowd and breeds it.</p></header>
+    <div class="grid g-2">
+      <div class="stack tight">
+        <div class="lab">Cross-entropy method · v2 gate, 10 generations</div>
+        <div class="viz" style="flex:1"><svg id="cem-svg" role="img" aria-label="CEM sampling ellipses shrinking onto a bound over ten generations"></svg></div>
+        <p class="small up" data-s="3" style="color:var(--ink2)">The sampling distribution shrinks every generation — σ fell 7× in ten — and cannot grow back. It settled on a floor with the racing line almost off (entry offset 0.055).</p>
+      </div>
+      <div class="stack tight">
+        <div class="lab">Genetic algorithm · v19, 16 generations</div>
+        <div class="viz" style="flex:1"><svg id="ga-svg" role="img" aria-label="GA population of 48 walking out of the previous parameter box"></svg></div>
+        <p class="small up" data-s="3" style="color:var(--ink2)">A population keeps its spread. We reopened two bounds v13's elites were pinned against, and the population walked out of the old box: the winner lives outside it.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>Left: CEM keeps a Gaussian over parameters and refits it to the elites. Watch the ellipse collapse — once it is narrow it can't explore again.</p><p>Right: the GA keeps 48 individual candidates, crosses and mutates them. The dashed box is where v13 allowed these two genes; its elites sat on the box's edge, which told us the box — not the controller — was the limit. Reopened in v19, the winner landed at 13.74 m/s and 2.04 m.</p></aside>
+</section>
+
+<section class="slide" id="s-curv" data-when="08-28 18:30|08-28 23:59" data-steps="4">
+  <div class="frame">
+    <header class="sh"><div class="lab">Failure that changed our approach</div><h2>The optimizer was right. Our curvature was wrong.</h2><span class="when">Aug 28 · the CEM gate</span>
+      <p class="sh-lead">The car judges how sharp a bend is from three glimpses of the centre line. We divided the wrong pair of numbers.</p></header>
+    <div class="grid g-5-7">
+      <div class="viz"><svg id="curv-svg" role="img" aria-label="A curve of radius R with lookahead points at 4, 9 and 16 metres"></svg></div>
+      <div class="stack">
+        <div class="up" data-s="2"><div class="eq-sm"><span class="c-red"><i>c</i>/<i>d</i></span> ≈ <i>d</i>/2<i>R</i></div><p class="small">What we used: offset divided by distance. It grows with <i>d</i> in every corner, so the far point always looked sharpest.</p></div>
+        <div class="up" data-s="3"><div class="eq-sm"><span class="c-green"><i>κ</i></span> ≈ Δslope / Δ<i>d</i> = 1/<i>R</i></div><p class="small">The fix: difference the segment slopes. Same answer at every distance — and the car's own pose cancels out.</p></div>
+        <div class="viz up" data-s="2" style="flex:1;min-height:calc(12*var(--u))"><svg id="curv-bars" role="img" aria-label="Bar comparison of c over d versus slope-difference curvature"></svg></div>
+        <p class="small up" data-s="4" style="color:var(--ink2)">The broken signal put 84.6% of corner weight on “entry” and 7.8% on “apex”. The CEM responded rationally — it switched the racing line off. We fixed the sensor model, not the search.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p>For a turn of radius R, the centre line's sideways offset at distance d grows like d²/2R. Dividing by d still leaves d/2R — it rises with distance even though the curve is constant.</p><p>Second differences kill both the constant (lateral offset) and the linear term (heading error), leaving 1/R. After the fix the GA's first ten generations went from 10 s to 9.4 s.</p></aside>
+</section>
+
+<section class="slide" id="s-surprises" data-when="08-28 12:00|09-01 23:59" data-steps="3">
+  <div class="frame">
+    <header class="sh"><div class="lab">Failures &amp; surprises</div><h2>Four surprises that changed our direction</h2><span class="when">from the 52-row decision log</span></header>
+    <div class="tscroll">
+      <table class="t">
+        <thead><tr><th>When</th><th>What surprised us</th><th>What we changed</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr data-s="0"><td class="when-c">Aug 28</td><td>One negative-throttle tick latches the drivetrain: engine force stays at zero until the car nearly stops — a ≈ 50 : 1 loss.</td><td>Coast (throttle 0) instead of braking in normal driving.</td><td><span class="st ok">+24% distance, a second lap</span></td></tr>
+          <tr data-s="1"><td class="when-c">Aug 29–30</td><td>The score gets gamed: one candidate crashed, recovered, then sprinted a single fast lap — and won. Rounding errors decided others.</td><td>Score three laps rather than one, and demand a clean run before rewarding speed.</td><td><span class="st ok">Only clean runs promoted</span></td></tr>
+          <tr data-s="2"><td class="when-c">Aug 30</td><td>Every starting point came back with exactly the same lap, 7.617 s. Four different attempts to beat it moved nothing at all.</td><td>Stop a version after ten rounds with no gain, and widen a limit before inventing something new.</td><td><span class="st hold">A floor of the policy, not the search</span></td></tr>
+          <tr data-s="3"><td class="when-c">Aug 31</td><td>Ten seconds of human driving used a brake-turn drift the search had never been allowed to try.</td><td>Corridor boost + a short drift pulse, tuned by the GA.</td><td><span class="st ok">7.60 → 7.19 s, clean on 33 seeds</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="terms"><b>Clean</b> — a run with zero damage and zero wall contact.<span class="sep">·</span><b>Flat generation</b> — one where nothing beat the current best; ten in a row ended a version.</p>
+  </div>
+  <aside class="notes"><p class="cue"><b>0:30 · 3 presses · leave by 4:00</b> — “Braking disabled the engine. The score got gamed. The plateau was the policy, not the search. Ten seconds of human driving beat all of it.”</p><p>If there is time for only one: the plateau row. When every seed produced the identical 457-tick lap, more search was pointless — the controller's structure was the limit. That is what sent us back to the simulator to drive by hand.</p><p>Laptop surprise not on the table: each search worker held ~950 MB; runs slowed into swap and the MacBook thermally slept mid-run. We restarted searches every ten generations from checkpoints.</p></aside>
+</section>
+
+<section class="slide" id="s-results" data-when="08-31 12:00|09-02 23:59" data-steps="0">
+  <div class="frame">
+    <header class="sh"><div class="lab">Evidence · final results</div><h2>What we shipped, and what we didn't</h2><span class="when">lap times are means over the listed seeds</span></header>
+    <div class="stack">
+      <div class="tscroll">
+        <table class="t">
+          <thead><tr><th>Controller</th><th>Promoted</th><th class="n">Best lap</th><th class="n">First lap</th><th>Seeds &amp; cleanliness</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td><code>minimum_viable</code></td><td class="when-c">Aug 28</td><td class="n">19.50 s</td><td class="n">—</td><td>seed 110 · 14/14 clean at promotion</td><td><span class="st ok">safe submission</span></td></tr>
+            <tr><td>GA plateau · v19</td><td class="when-c">Aug 30</td><td class="n">7.617 s</td><td class="n">8.45 s</td><td>30/30 clean · soak 100/100 · head-to-head 19/20</td><td><span class="st ok">promoted</span></td></tr>
+            <tr><td>Corridor boost · v25</td><td class="when-c">Aug 31</td><td class="n">7.594 s</td><td class="n">8.43 s</td><td>30/30 clean · soak 100/100 clean</td><td><span class="st ok">promoted</span></td></tr>
+            <tr class="hl"><td><code>race_faster</code> · v27</td><td class="when-c">Aug 31</td><td class="n key">7.190 s</td><td class="n">8.160 s</td><td>5/5 live grading seeds clean · 33/33 search · soak 100/100 survived, 91 clean</td><td><span class="st hold">final controller</span></td></tr>
+            <tr><td>Human sequence · v30</td><td class="when-c">Sep 1</td><td class="n">7.256 s</td><td class="n">8.255 s</td><td>33/33 clean</td><td><span class="st no">not promoted</span></td></tr>
+            <tr><td><code>race_speedmax</code> · v26</td><td class="when-c">Aug 31</td><td class="n">—</td><td class="n">—</td><td>peak 36.4 m/s · damage 0.15–0.76 accepted</td><td><span class="st no">speed experiment</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="board">
+        <span class="lab">Leaderboard</span><span class="lead">Final placement: <span class="fill-in">rank __ of __</span></span>
+        <span class="lab">Gates</span><span class="small">Every promotion passed 12 of 12 untouched validation seeds, 100 of 100 soak trials survived, and at least 12 of 20 role-swapped head-to-head races.</span>
+        <span class="lab">Sources</span><span class="small">search checkpoints, <code>faster-line-v27-gate/soak.json</code>, the Gradescope worker on seeds 110, 2026, 1893, 7656, 9340, and <code>scripts/controller_training/README.md</code>.</span>
+      </div>
+    </div>
+    <p class="terms"><b>Clean</b> — a run with zero damage and no wall contact.<span class="sep">·</span><b>Promotion gate</b> — a pass/fail check on seeds the search never saw; passing all of them is what let a candidate replace the shipped controller.<span class="sep">·</span><b>Soak</b> — the 100-seed endurance run, the last gate before shipping.</p>
+  </div>
+  <aside class="notes"><p class="cue"><b>0:25 · no presses · leave by 4:45</b> — “7.190 s mean best lap on the five grading seeds, every run clean, 100 of 100 soak trials survived.” Then say the leaderboard placement.</p><p>Point to the highlighted row: 7.190 s mean best lap and 8.160 s mean first lap on the five live grading seeds, every run clean, 3–4 laps each. On the 100-seed soak all survived; nine had small contact (0.48 s total).</p><p>Say the leaderboard placement here.</p></aside>
+</section>

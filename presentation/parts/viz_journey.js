@@ -23,16 +23,12 @@ const PTS = J.points.slice().sort((a, b) => a.t - b.t);
 const REJ = [{ t: edtEpoch(8, 28, 20, 18), lap: 9.65, v: 'v2 CEM gate', label: 'CEM gate' }].concat(J.rejected);
 const QUOTE = i => J.prompts[i].text;
 const BEATS = [
-  { T: edtEpoch(8, 28, 12, 50), z: 0, date: 'Aug 26 – 28', title: 'Chats as generations', text: 'Each band under the axis is one conversation with an agent — Codex in blue, Claude Code in purple. For the first 45 M tokens the car hadn’t turned a wheel: we explored the repo, planned imitation learning, then wrote plan.md.', stat: '20 chats · 504 M tokens' },
-  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 28 · midday', title: 'First, a car that finishes', text: 'A hand-tuned centre-line controller ran one 28.2 s lap, clean on 14 of 14 seeds. Twenty CEM generations on its 12 gains: 23.75 s. (Until a car laps twice, its only lap is its best lap.)', stat: '28.2 → 23.75 s' },
-  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'CEM on 14 gains of the same controller for 84 generations. We stopped when 8 of 14 deviations had collapsed onto their floor.', stat: '15.5 s' },
-  { T: edtEpoch(8, 28, 17, 47), key: 'CEM · faster-line', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', text: 'One negative-throttle tick latches the drivetrain. Coasting instead of braking, plus an outside–inside–outside line: +24% distance and a second lap.', stat: '9.57 s' },
-  { T: edtEpoch(8, 28, 23, 32), key: 'v2', z: 0, date: 'Aug 28 · night', title: 'CEM out, GA in', text: 'The CEM gate (red) collapsed onto a broken curvature signal — the failure slide explains it. With local curvature fixed, a genetic algorithm reached 9.4 s in ten generations and 9.0 s in forty.', stat: '9.00 s' },
-  { T: edtEpoch(8, 29, 17, 38), key: 'v5', z: 0, date: 'Aug 29', title: 'Move the box, not the search', text: 'v3–v5 reopened bounds the elites were pinned against and added one structural gene: the line may snap back to centre faster than it moves out. Searches ran from the terminal; the agent watched memory.', stat: '7.90 s' },
-  { T: edtEpoch(8, 29, 23, 20), key: 'v9', prompt: 1, z: 0, date: 'Aug 29 · night', title: 'Rank what you mean', text: 'Ranking on lap time exposed exploits: v8 (red) crashed, recovered, then set one fast lap. Three-lap and clean tiers now come before speed — and that question became our ten-flat-generations rule.', stat: '7.78 s' },
-  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', text: 'Launch cap, sweeper boost, reopened bounds: 7.617 s — exactly 457 ticks on all 30 seeds. Then v17, v18, v20, v22 and v24 each improved nothing.', stat: '457 ticks' },
-  { T: edtEpoch(8, 31, 23, 50), key: 'v27', prompt: 3, z: 1, date: 'Aug 31', title: 'Play the game', text: '“Think about drifting…”, then ten seconds of recorded human driving: a corridor boost followed by a 0.15 s brake-turn pulse into the next corner. Clean on all 33 seeds.', stat: '7.183 s' },
-  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 4, z: 1, date: 'Sep 1 – 2', title: 'Copy the idea, not the trajectory', text: 'Replaying the human’s full sequence — rotate, carry, hold, settle — was safe on 33 seeds but 0.068 s slower (red). v27 stayed. Now flip the x-axis above.', stat: 'v27 kept' },
+  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 26 – 28', title: 'Chats as generations', text: 'Each band under the axis is one conversation with an agent — Codex in blue, Claude Code in purple. Forty-five million tokens went by before the car turned a wheel; then a hand-tuned controller ran one 28.2 s lap, and twenty rounds of search made it 23.75 s.', stat: '28.2 → 23.75 s' },
+  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'Eighty-four rounds of search over the same fourteen numbers. We stopped when it stopped improving.', stat: '15.5 s' },
+  { T: edtEpoch(8, 28, 23, 32), key: 'v2', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', surprise: 'Braking switched the engine off until the car had nearly stopped — a fifty-to-one loss we never suspected.', text: 'Coasting instead of braking, plus a proper racing line: 24% more distance and a second lap.', stat: '9.57 → 9.00 s' },
+  { T: edtEpoch(8, 29, 23, 20), key: 'v9', z: 0, date: 'Aug 29', title: 'Widen the limits, fix the score', surprise: 'Our first genuinely fast candidate (red) crashed, recovered, then sprinted one good lap — and won on points. So we scored three laps instead of one and demanded a clean run before rewarding speed.', text: 'We also widened limits the winners kept bumping into.', stat: '7.78 s' },
+  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', surprise: 'Every starting point came back with exactly the same lap, and five versions in a row improved nothing at all. The limit was the car itself, not the search.', text: 'A launch limit, a boost through the long sweeper and wider limits had taken it to 7.617 s — and there it stopped.', stat: '7.617 s' },
+  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 3, z: 1, date: 'Aug 31 – Sep 1', title: 'Play the game', text: 'Ten seconds of one of us driving by hand showed a move the search had never been allowed to try: a boost down the corridor, then a hard brake into the corner to rotate the car. Clean from all 33 starts. Copying the whole human sequence (red), though, came out slower.', stat: '7.183 s' },
 ];
 
 HOOKS['s-journey'] = {
@@ -63,7 +59,7 @@ HOOKS['s-journey'] = {
     const plot = S('g', { 'clip-path': 'url(#jr-clip)' }, svg);
     this.plateau = S('g', {}, plot);
     this.plLine = S('line', { stroke: COL.mute, 'stroke-dasharray': '5 5', 'stroke-width': 1.2 }, this.plateau);
-    this.plText = S('text', { 'font-size': 13, class: 'tx-mute', text: '457 ticks = 7.617 s · every seed, v16 → v24' }, this.plateau);
+    this.plText = S('text', { 'font-size': 13, class: 'tx-mute', text: '7.617 s — the same lap from every start' }, this.plateau);
     this.curve = S('path', { fill: 'none', stroke: COL.blue, 'stroke-width': 2.6, 'stroke-linejoin': 'round' }, plot);
     this.dots = PTS.map(p => {
       const c = S('circle', { r: 3.4, fill: COL.blue }, plot);
@@ -73,9 +69,9 @@ HOOKS['s-journey'] = {
     this.rej = REJ.map(r => {
       const g = S('g', {}, plot);
       S('circle', { r: 6.5, fill: COL.bg, stroke: COL.red, 'stroke-width': 2 }, g);
-      S('text', { x: 10, y: -8, 'font-size': 13, fill: COL.red, text: r.label }, g);
+      const t = S('text', { x: 10, y: -8, 'font-size': 13, fill: COL.red, text: r.label }, g);
       S('title', { text: `${r.v} · ${r.lap.toFixed(3)} s · rejected: ${r.label}` }, g);
-      return { r, g };
+      return { r, g, t };
     });
     this.prompts = J.prompts.map(p => {
       const g = S('g', {}, svg);
@@ -145,9 +141,17 @@ HOOKS['s-journey'] = {
     const last = vis[vis.length - 1];
     this.end.setAttribute('opacity', last ? 1 : 0);
     if (last) { this.end.setAttribute('cx', this.X(last.t)); this.end.setAttribute('cy', this.Y(last.lap)); }
-    this.rej.forEach(({ r, g }) => {
-      g.setAttribute('transform', `translate(${this.X(r.t).toFixed(1)},${this.Y(r.lap).toFixed(1)})`);
+    const placed = [];
+    this.rej.forEach(({ r, g, t }) => {
+      const x = this.X(r.t), y = this.Y(r.lap);
+      g.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`);
       g.setAttribute('opacity', r.t <= s.rev ? 1 : 0);
+      const flip = x > this.R - 260; // keep long labels inside the plot
+      t.setAttribute('x', flip ? -10 : 10);
+      t.setAttribute('text-anchor', flip ? 'end' : 'start');
+      const crowded = placed.some(p => Math.abs(p[0] - x) < 160 && Math.abs(p[1] - y) < 26);
+      t.setAttribute('y', crowded ? 20 : -8);
+      placed.push([x, y]);
     });
     const pb = BEATS[s.beat].prompt;
     this.prompts.forEach(({ p, g }, i) => {
@@ -156,7 +160,7 @@ HOOKS['s-journey'] = {
     });
     const ply = this.Y(7.6167), plx = this.X(edtEpoch(8, 30, 20, 35));
     this.plLine.setAttribute('x1', plx); this.plLine.setAttribute('x2', R); this.plLine.setAttribute('y1', ply); this.plLine.setAttribute('y2', ply);
-    this.plText.setAttribute('x', Math.min(plx + 8, R - 290)); this.plText.setAttribute('y', ply - 8);
+    this.plText.setAttribute('x', Math.min(plx + 8, R - 250)); this.plText.setAttribute('y', ply - 8);
     this.plateau.setAttribute('opacity', s.z > 0.5 && s.rev >= edtEpoch(8, 30, 20, 35) ? s.z : 0);
     const kb = BEATS[s.beat].key, kp = kb && PTS.filter(p => p.v === kb).pop();
     this.ring.setAttribute('opacity', kp && kp.t <= s.rev ? 1 : 0);
@@ -167,6 +171,7 @@ HOOKS['s-journey'] = {
     this.panel.innerHTML =
       `<div class="jr-date">${b.date} · beat ${k + 1} of ${BEATS.length}</div><h3>${b.title}</h3>` +
       (p ? `<blockquote class="q">${p.text}<cite>— Zhi, to Codex · ${fmtDay(p.t)}, ${fmtHM(p.t)}</cite></blockquote>` : '') +
+      (b.surprise ? `<div class="surprise"><span class="lab">The surprise</span><p>${b.surprise}</p></div>` : '') +
       `<p>${b.text}</p><div class="spacer"></div><div class="jr-stat">${b.stat}</div>`;
   },
   step(k) {

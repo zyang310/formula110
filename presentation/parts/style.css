@@ -32,6 +32,15 @@ code,.tt{font-family:var(--mono);font-size:.92em;color:var(--ink2)}
 .sh h2{font-size:var(--t-h);line-height:1.1}
 .sh .when{font-style:italic;color:var(--mute);font-size:var(--t-small);white-space:nowrap}
 .lab{font-size:var(--t-lab);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.sh .sh-lead{grid-column:1/-1;font-size:var(--t-body);color:var(--ink2);max-width:58em;margin-top:calc(.35*var(--u))}
+.terms{font-size:var(--t-lab);color:var(--mute);border-top:1px solid var(--line);padding-top:calc(.55*var(--u));margin-top:calc(.5*var(--u));line-height:1.5}
+.closing{border-top:1px solid var(--line2);padding-top:calc(.9*var(--u));margin-top:calc(.7*var(--u));display:flex;gap:calc(2.4*var(--u));align-items:baseline;flex-wrap:wrap}
+.closing .stat{font-size:calc(1.75*var(--u));color:var(--ink);font-variant-numeric:lining-nums tabular-nums;white-space:nowrap}
+.closing .q-line{font-size:var(--t-small);color:var(--ink2);flex:1;min-width:20em;line-height:1.4}
+.terms b{color:var(--ink2);font-weight:400}
+.terms .sep{opacity:.5;padding:0 .5em}
+.gloss p{font-size:var(--t-small);color:var(--ink2);line-height:1.35}
+.gloss b{color:var(--ink);font-weight:400}
 .lead{font-size:var(--t-lead);line-height:1.34}
 .small{font-size:var(--t-small);color:var(--mute);line-height:1.4}
 h3{font-size:calc(1.9*var(--u));line-height:1.15}
@@ -54,6 +63,9 @@ ul.pts li::before{content:"";position:absolute;left:0;top:.56em;width:calc(.42*v
 ol.pts{counter-reset:k}
 ol.pts li{counter-increment:k;padding-left:calc(2*var(--u))}
 ol.pts li::before{content:counter(k);position:absolute;left:0;top:0;color:var(--mute);font-variant-numeric:tabular-nums}
+ul.pts.big{gap:calc(1.25*var(--u))}
+ul.pts.big li{font-size:calc(1.78*var(--u));line-height:1.3;padding-left:calc(2*var(--u));color:var(--ink)}
+ul.pts.big li::before{top:.62em;width:calc(.5*var(--u));height:calc(.5*var(--u));background:var(--mute)}
 .stage-list{display:flex;flex-direction:column;gap:calc(1.3*var(--u))}
 .stage-list .row{display:grid;grid-template-columns:calc(2.2*var(--u)) 1fr;column-gap:calc(.6*var(--u))}
 .stage-list .k{font-size:calc(1.9*var(--u));line-height:1;color:var(--mute);font-variant-numeric:tabular-nums}
@@ -123,6 +135,9 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
 #jr-panel p{font-size:var(--t-small);color:var(--ink2)}
 #jr-panel .jr-stat{font-size:calc(2.6*var(--u));line-height:1;font-variant-numeric:lining-nums tabular-nums}
 #jr-panel .q{font-size:var(--t-small)}
+#jr-panel .surprise{border-left:2px solid var(--yellow);padding-left:calc(.9*var(--u))}
+#jr-panel .surprise .lab{display:block;color:var(--yellow);margin-bottom:calc(.25*var(--u))}
+#jr-panel .surprise p{font-size:var(--t-small);color:var(--ink2)}
 .chart-col{display:grid;grid-template-rows:auto minmax(0,1fr);gap:calc(.8*var(--u));min-height:0}
 
 .ledger{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
@@ -144,6 +159,8 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
 #ribbon button{font-size:var(--t-lab);padding:.2em .8em}
 #notes{position:fixed;left:50%;bottom:calc(6.2*var(--u));transform:translateX(-50%);width:min(calc(92*var(--u)),96vw);max-height:34vh;overflow:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:14px 20px 16px;font-size:max(15px,var(--t-small));line-height:1.5;color:var(--ink);box-shadow:0 14px 44px rgba(0,0,0,.55);z-index:5}
 #notes .lab{margin-bottom:6px}
+#notes .cue{color:var(--ink2);border-left:2px solid var(--yellow);padding-left:10px;margin-bottom:10px}
+#notes .cue b{color:var(--yellow);font-weight:400;letter-spacing:.02em}
 #notes p+p{margin-top:.5em}
 .slide aside.notes{display:none}
 

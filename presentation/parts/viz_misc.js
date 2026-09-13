@@ -1,3 +1,45 @@
+/* ================= what a controller is ================= */
+HOOKS['s-what'] = {
+  init(sl) {
+    const svg = sl.querySelector('#what-svg');
+    svg.setAttribute('viewBox', '-30 0 580 430');
+    const mk = S('marker', { id: 'what-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, S('defs', {}, svg));
+    S('path', { d: 'M0 0 L10 5 L0 10 z', fill: COL.line2 }, mk);
+    const c = [260, 210], R = 128;
+    const pt = deg => [c[0] + R * Math.cos((deg - 90) * Math.PI / 180), c[1] + R * Math.sin((deg - 90) * Math.PI / 180)];
+    const nodes = [[0, 'Sense', 'what is just ahead?', COL.blue], [120, 'Decide', 'aim where, how fast?', COL.yellow], [240, 'Act', 'throttle and steering', COL.green]];
+    nodes.forEach(([deg]) => {
+      const a = pt(deg + 18), b = pt(deg + 102);
+      S('path', {
+        d: `M${a[0].toFixed(1)} ${a[1].toFixed(1)} A ${R} ${R} 0 0 1 ${b[0].toFixed(1)} ${b[1].toFixed(1)}`,
+        fill: 'none', stroke: COL.line2, 'stroke-width': 2, 'marker-end': 'url(#what-arrow)', class: 'draw', 'data-s': 0,
+      }, svg);
+    });
+    nodes.forEach(([deg, title, sub, col]) => {
+      const p = pt(deg);
+      S('circle', { cx: p[0], cy: p[1], r: 10, fill: col, stroke: COL.bg, 'stroke-width': 3 }, svg);
+      const anchor = deg === 0 ? 'middle' : deg === 120 ? 'start' : 'end';
+      const dx = deg === 0 ? 0 : deg === 120 ? 24 : -24;
+      const dy = deg === 0 ? -30 : 6;
+      S('text', { x: p[0] + dx, y: p[1] + dy, 'font-size': 21, 'text-anchor': anchor, class: 'tx-ink', text: title }, svg);
+      S('text', { x: p[0] + dx, y: p[1] + dy + 23, 'font-size': 15, 'text-anchor': anchor, text: sub }, svg);
+    });
+    S('text', { x: c[0], y: c[1] - 4, 'font-size': 36, 'text-anchor': 'middle', class: 'tx-ink', text: '60×' }, svg);
+    S('text', { x: c[0], y: c[1] + 24, 'font-size': 16, 'text-anchor': 'middle', text: 'a second' }, svg);
+    S('text', { x: c[0], y: c[1] + 46, 'font-size': 13, 'text-anchor': 'middle', text: '16.7 ms per decision' }, svg);
+    this.dot = S('circle', { r: 7, fill: COL.ink, stroke: COL.bg, 'stroke-width': 2 }, svg);
+    this.c = c; this.R = R; this.t = 0;
+    this.place();
+  },
+  place() {
+    const a = (this.t * 80 - 90) * Math.PI / 180;
+    this.dot.setAttribute('cx', this.c[0] + this.R * Math.cos(a));
+    this.dot.setAttribute('cy', this.c[1] + this.R * Math.sin(a));
+  },
+  enter() { if (ENV.reduce) return; this.loop = dt => { this.t += dt; this.place(); }; addLoop(this.loop); },
+  leave() { if (this.loop) removeLoop(this.loop); },
+};
+
 /* ================= task schematic ================= */
 HOOKS['s-task'] = {
   init(sl) {
@@ -296,14 +338,14 @@ HOOKS['s-learned'] = {
     const svg = sl.querySelector('#learned-bars');
     svg.setAttribute('viewBox', '0 0 640 330');
     const rows = [
-      { label: '28.2 → 9.0 s', when: 'Aug 28', s: 12.70, n: 6.50, sv: 'hand-tuned → CEM ×2', nv: 'coasting + racing line, curvature fix' },
-      { label: '9.0 → 7.9 s', when: 'Aug 29', s: 0.483, n: 0.617, sv: 'v3, v5 bounds', nv: 'v4 line-release gene' },
-      { label: '7.9 → 7.18 s', when: 'Aug 29–31', s: 0.116, n: 0.600, sv: 'v7, v9 objectives', nv: 'launch cap, sweeper ×2, corridor, drift' },
+      { label: '28.2 → 9.0 s', when: 'Aug 28', s: 12.70, n: 6.50, sv: 'two rounds of tuning', nv: 'coasting and a racing line' },
+      { label: '9.0 → 7.9 s', when: 'Aug 29', s: 0.483, n: 0.617, sv: 'wider limits', nv: 'a new steering rule' },
+      { label: '7.9 → 7.18 s', when: 'Aug 29–31', s: 0.116, n: 0.600, sv: 'better scoring', nv: 'launch limit, sweeper boost, drift' },
     ];
     const L = 150, R = 630;
     const lg = S('g', { transform: 'translate(150,14)' }, svg);
-    S('rect', { x: 0, y: -9, width: 14, height: 10, rx: 2, fill: COL.blue }, lg); S('text', { x: 20, y: 0, 'font-size': 13, class: 'tx-ink', text: 'search inside a fixed controller' }, lg);
-    S('rect', { x: 238, y: -9, width: 14, height: 10, rx: 2, fill: COL.yellow }, lg); S('text', { x: 258, y: 0, 'font-size': 13, class: 'tx-ink', text: 'new structure: behaviour, feature, fix' }, lg);
+    S('rect', { x: 0, y: -9, width: 14, height: 10, rx: 2, fill: COL.blue }, lg); S('text', { x: 20, y: 0, 'font-size': 13, class: 'tx-ink', text: 'searching for better numbers' }, lg);
+    S('rect', { x: 238, y: -9, width: 14, height: 10, rx: 2, fill: COL.yellow }, lg); S('text', { x: 258, y: 0, 'font-size': 13, class: 'tx-ink', text: 'new behaviour we added' }, lg);
     rows.forEach((r, i) => {
       const y = 46 + i * 94, tot = r.s + r.n, xs = L + (r.s / tot) * (R - L);
       S('text', { x: L - 12, y: y + 20, 'font-size': 16, 'text-anchor': 'end', class: 'tx-ink', text: r.label }, svg);

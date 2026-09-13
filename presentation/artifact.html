@@ -38,6 +38,15 @@ code,.tt{font-family:var(--mono);font-size:.92em;color:var(--ink2)}
 .sh h2{font-size:var(--t-h);line-height:1.1}
 .sh .when{font-style:italic;color:var(--mute);font-size:var(--t-small);white-space:nowrap}
 .lab{font-size:var(--t-lab);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.sh .sh-lead{grid-column:1/-1;font-size:var(--t-body);color:var(--ink2);max-width:58em;margin-top:calc(.35*var(--u))}
+.terms{font-size:var(--t-lab);color:var(--mute);border-top:1px solid var(--line);padding-top:calc(.55*var(--u));margin-top:calc(.5*var(--u));line-height:1.5}
+.closing{border-top:1px solid var(--line2);padding-top:calc(.9*var(--u));margin-top:calc(.7*var(--u));display:flex;gap:calc(2.4*var(--u));align-items:baseline;flex-wrap:wrap}
+.closing .stat{font-size:calc(1.75*var(--u));color:var(--ink);font-variant-numeric:lining-nums tabular-nums;white-space:nowrap}
+.closing .q-line{font-size:var(--t-small);color:var(--ink2);flex:1;min-width:20em;line-height:1.4}
+.terms b{color:var(--ink2);font-weight:400}
+.terms .sep{opacity:.5;padding:0 .5em}
+.gloss p{font-size:var(--t-small);color:var(--ink2);line-height:1.35}
+.gloss b{color:var(--ink);font-weight:400}
 .lead{font-size:var(--t-lead);line-height:1.34}
 .small{font-size:var(--t-small);color:var(--mute);line-height:1.4}
 h3{font-size:calc(1.9*var(--u));line-height:1.15}
@@ -60,6 +69,9 @@ ul.pts li::before{content:"";position:absolute;left:0;top:.56em;width:calc(.42*v
 ol.pts{counter-reset:k}
 ol.pts li{counter-increment:k;padding-left:calc(2*var(--u))}
 ol.pts li::before{content:counter(k);position:absolute;left:0;top:0;color:var(--mute);font-variant-numeric:tabular-nums}
+ul.pts.big{gap:calc(1.25*var(--u))}
+ul.pts.big li{font-size:calc(1.78*var(--u));line-height:1.3;padding-left:calc(2*var(--u));color:var(--ink)}
+ul.pts.big li::before{top:.62em;width:calc(.5*var(--u));height:calc(.5*var(--u));background:var(--mute)}
 .stage-list{display:flex;flex-direction:column;gap:calc(1.3*var(--u))}
 .stage-list .row{display:grid;grid-template-columns:calc(2.2*var(--u)) 1fr;column-gap:calc(.6*var(--u))}
 .stage-list .k{font-size:calc(1.9*var(--u));line-height:1;color:var(--mute);font-variant-numeric:tabular-nums}
@@ -129,6 +141,9 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
 #jr-panel p{font-size:var(--t-small);color:var(--ink2)}
 #jr-panel .jr-stat{font-size:calc(2.6*var(--u));line-height:1;font-variant-numeric:lining-nums tabular-nums}
 #jr-panel .q{font-size:var(--t-small)}
+#jr-panel .surprise{border-left:2px solid var(--yellow);padding-left:calc(.9*var(--u))}
+#jr-panel .surprise .lab{display:block;color:var(--yellow);margin-bottom:calc(.25*var(--u))}
+#jr-panel .surprise p{font-size:var(--t-small);color:var(--ink2)}
 .chart-col{display:grid;grid-template-rows:auto minmax(0,1fr);gap:calc(.8*var(--u));min-height:0}
 
 .ledger{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
@@ -150,6 +165,8 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
 #ribbon button{font-size:var(--t-lab);padding:.2em .8em}
 #notes{position:fixed;left:50%;bottom:calc(6.2*var(--u));transform:translateX(-50%);width:min(calc(92*var(--u)),96vw);max-height:34vh;overflow:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:14px 20px 16px;font-size:max(15px,var(--t-small));line-height:1.5;color:var(--ink);box-shadow:0 14px 44px rgba(0,0,0,.55);z-index:5}
 #notes .lab{margin-bottom:6px}
+#notes .cue{color:var(--ink2);border-left:2px solid var(--yellow);padding-left:10px;margin-bottom:10px}
+#notes .cue b{color:var(--yellow);font-weight:400;letter-spacing:.02em}
 #notes p+p{margin-top:.5em}
 .slide aside.notes{display:none}
 
@@ -203,32 +220,31 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       <div id="title-read" class="readouts"></div>
     </div>
   </div>
-  <aside class="notes"><p>Open on the race itself: both cars are real 30-second simulator runs from seed 110. Grey is our safe baseline, yellow is the controller we shipped. Same start, same physics.</p><p>One sentence of thesis: the lap got faster because two loops worked together — a search loop on the laptop and a conversation loop with AI agents — and the biggest late jump came from us playing the game by hand.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:15 · no presses · leave by 0:15</b> — “Same track, same start. Grey was our first safe car, yellow is what we shipped: 28 seconds down to 7.19.”</p><p>Open on the race itself: both cars are real 30-second simulator runs from seed 110. Grey is our safe baseline, yellow is the controller we shipped. Same start, same physics.</p><p>One sentence of thesis: the lap got faster because two loops worked together — a search loop on the laptop and a conversation loop with AI agents — and the biggest late jump came from us playing the game by hand.</p></aside>
 </section>
-
-<section class="slide" id="s-task" data-when="08-26 12:00|08-27 23:00" data-steps="3">
+<section class="slide" id="s-what" data-when="08-26 12:00|08-27 23:00" data-steps="3">
   <div class="frame">
-    <header class="sh"><div class="lab">The problem</div><h2>One function, called sixty times a second</h2><span class="when">Aug 26–27 · reading the repo</span></header>
+    <header class="sh"><div class="lab">Foundation</div><h2>What a controller is</h2><span class="when">the whole job, in one loop</span></header>
     <div class="grid g-5-7">
+      <div class="viz"><svg id="what-svg" role="img" aria-label="A loop: sense, decide, act, sixty times a second"></svg></div>
       <div class="stack">
-        <div class="eq"><i>f</i> : sensors → (throttle, steer)</div>
-        <ul class="pts">
-          <li class="up" data-s="1"><b>Camera</b>: where the centre line sits <span class="num">4</span>, <span class="num">9</span> and <span class="num">16</span> m ahead — lateral offsets <i>c</i><sub>0</sub>, <i>c</i><sub>1</sub>, <i>c</i><sub>2</sub> — plus heading error.</li>
-          <li class="up" data-s="2"><b>LiDAR</b>: distances to walls and cars. <b>IMU</b>: yaw rate. <b>Odometry</b>: speed.</li>
-          <li class="up" data-s="3"><b>Output</b>: throttle ∈ [−1, 1] and steer ∈ [−1, 1], every 1/60 s.</li>
+        <p class="lead up" data-s="0">A controller is a <em>function</em>. Numbers about the road go in; two numbers come out — how hard to push the pedal, how far to turn the wheel. Then it happens again, sixty times a second.</p>
+        <div class="eq up" data-s="1"><i>f</i> : sensors → (throttle, steer)</div>
+        <ul class="pts up" data-s="2">
+          <li>The car has no map and no plan. It cannot think ahead to turn four; it can only answer <em>“what now?”</em> from what it senses this instant.</li>
+          <li>Ours answers with rules: <i>if the road bends this much, aim this far off centre and hold this speed.</i></li>
+          <li>Every rule contains numbers. <b>We wrote the rules; a search found the numbers.</b> That split runs through the whole project.</li>
         </ul>
-        <div class="spacer"></div>
-        <p class="small up" data-s="3">Score: survive 30 s, then laps, then speed. Every seed spawns the car somewhere different on the 181.1 m lap. CPU only, ≤ 512 MiB.</p>
+        <p class="small up" data-s="3">So a lap can only get faster two ways: a straighter path through the corners, or more speed carried through them.</p>
       </div>
-      <div class="viz"><svg id="task-svg" role="img" aria-label="Diagram of the car, the three camera lookahead points and LiDAR rays"></svg></div>
     </div>
   </div>
-  <aside class="notes"><p>The controller never sees its position on the map. It sees geometry relative to itself: where the centre line is at three distances ahead, wall distances, speed, yaw rate.</p><p>That matters for everything later: a controller that reacts to local geometry works from any spawn point, which is exactly what random seeds test.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 3 presses · leave by 0:50</b> — “It’s a function, sixty times a second. No map, no plan. Ours follows rules we wrote — and a search found the numbers inside them.”</p><p>Start here if anyone is unsure what we built. The car is not planning a lap; it is reacting, 60 times a second, to a few numbers about the road immediately ahead.</p><p>The last bullet is the thesis of the talk: the structure is ours, the numbers came from search. The learning slide near the end measures which of the two actually bought the seconds.</p></aside>
 </section>
-
 <section class="slide" id="s-approaches" data-when="08-28 12:00|08-30 23:30" data-steps="3">
   <div class="frame">
-    <header class="sh"><div class="lab">Approaches</div><h2>Two ways to learn a lap</h2><span class="when">Aug 28–30 · split on Aug 28</span></header>
+    <header class="sh"><div class="lab">Approaches</div><h2>Two ways to learn a lap</h2><span class="when">Aug 28–30 · split on Aug 28</span>
+      <p class="sh-lead">Two ways to get a fast lap: memorize the answer for this track, or learn to react to whatever is ahead.</p></header>
     <div class="grid g-2">
       <div class="stack up" data-s="1">
         <div class="who c-teal">Lucas · alternative</div>
@@ -247,63 +263,34 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
         <div class="up" data-s="3"><span class="st ok">Selected — everything after this builds on it</span></div>
       </div>
     </div>
+    <p class="terms"><b>Seed</b> — a starting point on the lap; the track never changes, only where you begin.<span class="sep">·</span><b>Cross-entropy search</b> — keep a bell curve over the numbers and narrow it onto the winners.<span class="sep">·</span><b>Genetic algorithm</b> — keep a crowd instead, and breed it.</p>
   </div>
-  <aside class="notes"><p>Lucas: explain the tape idea. It optimizes actions directly, which is powerful on one fixed track, but memory grew with every position and the result would not transfer to a new start or track. That, plus the crash, is why we stopped it on Aug 30.</p><p>Zhi: the reflex idea. The policy is interpretable — every parameter is a speed, a distance, a gain — so search can tune it cheaply and we can read what it learned. Our very first plan (Aug 26) was imitation learning; we never built it, but the human recording returns later.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 3 presses · leave by 1:25</b> — “Lucas tried memorizing the track; it ran out of memory and wouldn’t transfer. I tuned a reflex, and that’s what we kept.”</p><p>Lucas: explain the tape idea. It optimizes actions directly, which is powerful on one fixed track, but memory grew with every position and the result would not transfer to a new start or track. That, plus the crash, is why we stopped it on Aug 30.</p><p>Zhi: the reflex idea. The policy is interpretable — every parameter is a speed, a distance, a gain — so search can tune it cheaply and we can read what it learned. Our very first plan (Aug 26) was imitation learning; we never built it, but the human recording returns later.</p></aside>
 </section>
-
 <section class="slide" id="s-controller" data-when="08-28 12:00|08-31 23:59" data-steps="4">
   <div class="frame">
-    <header class="sh"><div class="lab">Primary approach</div><h2>How the controller drives</h2><span class="when"><code>controllers.race_faster</code> · v27</span></header>
+    <header class="sh"><div class="lab">Primary approach</div><h2>How the controller drives</h2><span class="when"><code>controllers.race_faster</code> · v27</span>
+      <p class="sh-lead">Sixty times a second it answers two questions: where on the road do I want to be, and how fast dare I go there?</p></header>
     <div class="grid g-7-5">
       <div class="stack tight">
         <div class="viz" style="flex:1"><svg id="ctrl-svg" role="img" aria-label="One lap of the final controller on seed 110, coloured by speed, against the centre line"></svg></div>
         <div class="legend up" data-s="3" id="ctrl-legend"></div>
       </div>
       <div class="stage-list">
-        <div class="row up" data-s="1"><span class="k">1</span><div><h3>Read the road</h3><p>Turn the three camera offsets into the local curvature <i>κ</i> ahead — near and far.</p></div></div>
-        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Outside → inside → outside: a target up to 3.1 m off centre, blended by corner phase (entry, apex, exit).</p></div></div>
-        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>25.1 m/s on straights, 13.7 m/s in corners. Above target it <em>coasts</em>; it never brakes just to slow down.</p></div></div>
-        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Stay alive — plus three tricks</h3><p>NORMAL → AVOID → RECOVER near walls. Event moves: a launch cap, a sweeper boost, and a 0.15 s brake-turn drift after the long corridor.</p></div></div>
-        <p class="small up" data-s="4"><code>ControllerParameters</code> has 116 named fields; each search version tuned 1–20 of them.</p>
+        <div class="row up" data-s="1"><span class="k">1</span><div><h3>Read the road</h3><p>How sharply is the road bending 4, 9 and 16 metres ahead?</p></div></div>
+        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Swing wide, cut the corner, run wide again — up to 3 m off the centre line.</p></div></div>
+        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>About 25 m/s on the straights, 14 in the corners. Above that it lifts off rather than brakes.</p></div></div>
+        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Stay out of the wall</h3><p>If a wall gets close it abandons the line and slows. And once a lap it brakes hard into a corner to rotate the car — the trick we copied from a human.</p></div></div>
+        <p class="small up" data-s="4">116 numbers set all of this. Each round of searching tuned 1–20 of them.</p>
       </div>
     </div>
   </div>
-  <aside class="notes"><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 4 presses · leave by 2:00</b> — “Read the bend ahead, pick a line, pick a speed, stay alive. It coasts instead of braking, and it drifts once per lap.”</p><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
 </section>
-
-<section class="slide" id="s-eval" data-when="08-28 12:00|09-01 23:59" data-steps="3">
-  <div class="frame">
-    <header class="sh"><div class="lab">Evaluation</div><h2>How we decided one controller beat another</h2><span class="when">fixed on Aug 28, never re-drawn</span></header>
-    <div class="grid g-2">
-      <div class="stack tight">
-        <div class="viz" style="flex:1"><svg id="eval-seeds" role="img" aria-label="147 seeds grouped into official, training, validation, live grading and soak suites"></svg></div>
-        <p class="small up" data-s="3">Our evaluator replays the Gradescope worker's tick order; a parity trial matched it on all 11 grading metrics.</p>
-      </div>
-      <div class="stack">
-        <div class="up" data-s="2"><div class="lab" style="margin-bottom:.6em">Ranking — the first difference wins</div>
-          <ol class="pts small" style="color:var(--ink2)">
-            <li>Survived all 30 s</li>
-            <li>Completed a lap</li>
-            <li>Inside the incident budget: ≤ 0.25 damage, ≤ 1.5 s wall contact</li>
-            <li>Completed three laps, then fully clean</li>
-            <li>Best lap — worst seed, then p90, median, mean, counted in whole 1/60 s ticks</li>
-            <li>First lap, then distance</li>
-          </ol></div>
-        <div class="up" data-s="3"><div class="lab" style="margin-bottom:.6em">Promotion gates</div>
-          <ul class="pts small" style="color:var(--ink2)">
-            <li>12 untouched validation seeds, all clean</li>
-            <li>100 fresh soak seeds, zero eliminations</li>
-            <li>≥ 12 of 20 role-swapped head-to-head races against <code>minimum_viable</code></li>
-          </ul></div>
-      </div>
-    </div>
-  </div>
-  <aside class="notes"><p>The optimizer only ever ranked candidates on training seeds (plus the two official seeds from v10, and the five live grading seeds from v26). Validation and soak seeds stayed untouched until a candidate asked to be promoted.</p><p>The ranking is lexicographic: safety tiers first, lap time only among equally safe candidates. We rewrote the lap-time part ten times — the surprises slide explains why.</p></aside>
-</section>
-
 <section class="slide" id="s-loops" data-when="all" data-steps="2">
   <div class="frame">
-    <header class="sh"><div class="lab">Development strategy</div><h2>Two loops: the laptop and the chat</h2><span class="when">Aug 26 – Sep 2</span></header>
+    <header class="sh"><div class="lab">Development strategy</div><h2>Two loops: the laptop and the chat</h2><span class="when">Aug 26 – Sep 2</span>
+      <p class="sh-lead">One loop is a computer trying thousands of small variations. The other is us deciding which variations are worth trying.</p></header>
     <div class="grid g-5-7">
       <div class="viz"><svg id="loops-svg" role="img" aria-label="An inner search loop nested inside an outer conversation loop"></svg></div>
       <div class="stack">
@@ -320,13 +307,14 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
           </ul></div>
       </div>
     </div>
+    <p class="terms"><b>Generation</b> — one round of the inner loop: race every candidate, keep the best, breed the next batch.<span class="sep">·</span><b>Elite</b> — the best few in a generation, the only ones allowed to breed.</p>
   </div>
-  <aside class="notes"><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:30 · 2 presses · leave by 2:30</b> — “The laptop tried 570,000 races. The chats decided what was worth trying: 30 versions, 52 logged decisions.”</p><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
 </section>
-
-<section class="slide" id="s-journey" data-when="all" data-steps="9">
+<section class="slide" id="s-journey" data-when="all" data-steps="5">
   <div class="frame">
-    <header class="sh"><div class="lab">Evidence</div><h2>Lap time, one chat at a time</h2><span class="when" id="jr-when">Aug 26 – Sep 2</span></header>
+    <header class="sh"><div class="lab">Evidence · and what surprised us</div><h2>Lap time, one chat at a time</h2><span class="when" id="jr-when">Aug 26 – Sep 2</span>
+      <p class="sh-lead">Every step down is a controller we promoted — and most of them began with something surprising us.</p></header>
     <div class="grid g-8-4">
       <div class="chart-col">
         <div class="btns" role="group" aria-label="Horizontal axis">
@@ -340,67 +328,12 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       <div id="jr-panel" aria-live="polite"></div>
     </div>
   </div>
-  <aside class="notes"><p>Step through the beats. Each shaded band on the axis is one conversation with an agent (blue Codex, purple Claude Code). Brown diamonds are moments where one of us asked a question that changed direction.</p><p>Then flip the x-axis: against calendar time the search looks steady; against simulated races the big early drops were cheap and the last 0.4 s came after half a million races; against tokens you can see which conversations paid.</p></aside>
+  <aside class="notes"><p class="cue"><b>1:20 · 5 presses · leave by 3:50</b> — Step the six beats; each carries the surprise that caused it. Land on the plateau and the drift. Flip the x-axis if time allows; if you are running long, stop after the plateau beat.</p><p>Step through the beats. Each shaded band on the axis is one conversation with an agent (blue Codex, purple Claude Code). Brown diamonds are moments where one of us asked a question that changed direction.</p><p>Then flip the x-axis: against calendar time the search looks steady; against simulated races the big early drops were cheap and the last 0.4 s came after half a million races; against tokens you can see which conversations paid.</p></aside>
 </section>
-
-<section class="slide" id="s-search" data-when="08-28 20:00|08-30 23:30" data-steps="3">
-  <div class="frame">
-    <header class="sh"><div class="lab">Evidence · inside the search</div><h2>Why we swapped CEM for a genetic algorithm</h2><span class="when">real populations from our checkpoints</span></header>
-    <div class="grid g-2">
-      <div class="stack tight">
-        <div class="lab">Cross-entropy method · v2 gate, 10 generations</div>
-        <div class="viz" style="flex:1"><svg id="cem-svg" role="img" aria-label="CEM sampling ellipses shrinking onto a bound over ten generations"></svg></div>
-        <p class="small up" data-s="3" style="color:var(--ink2)">The sampling distribution shrinks every generation — σ fell 7× in ten — and cannot grow back. It settled on a floor with the racing line almost off (entry offset 0.055).</p>
-      </div>
-      <div class="stack tight">
-        <div class="lab">Genetic algorithm · v19, 16 generations</div>
-        <div class="viz" style="flex:1"><svg id="ga-svg" role="img" aria-label="GA population of 48 walking out of the previous parameter box"></svg></div>
-        <p class="small up" data-s="3" style="color:var(--ink2)">A population keeps its spread. We reopened two bounds v13's elites were pinned against, and the population walked out of the old box: the winner lives outside it.</p>
-      </div>
-    </div>
-  </div>
-  <aside class="notes"><p>Left: CEM keeps a Gaussian over parameters and refits it to the elites. Watch the ellipse collapse — once it is narrow it can't explore again.</p><p>Right: the GA keeps 48 individual candidates, crosses and mutates them. The dashed box is where v13 allowed these two genes; its elites sat on the box's edge, which told us the box — not the controller — was the limit. Reopened in v19, the winner landed at 13.74 m/s and 2.04 m.</p></aside>
-</section>
-
-<section class="slide" id="s-curv" data-when="08-28 18:30|08-28 23:59" data-steps="4">
-  <div class="frame">
-    <header class="sh"><div class="lab">Failure that changed our approach</div><h2>The optimizer was right. Our curvature was wrong.</h2><span class="when">Aug 28 · the CEM gate</span></header>
-    <div class="grid g-5-7">
-      <div class="viz"><svg id="curv-svg" role="img" aria-label="A curve of radius R with lookahead points at 4, 9 and 16 metres"></svg></div>
-      <div class="stack">
-        <div class="up" data-s="2"><div class="eq-sm"><span class="c-red"><i>c</i>/<i>d</i></span> ≈ <i>d</i>/2<i>R</i></div><p class="small">What we used: offset divided by distance. It grows with <i>d</i> in every corner, so the far point always looked sharpest.</p></div>
-        <div class="up" data-s="3"><div class="eq-sm"><span class="c-green"><i>κ</i></span> ≈ Δslope / Δ<i>d</i> = 1/<i>R</i></div><p class="small">The fix: difference the segment slopes. Same answer at every distance — and the car's own pose cancels out.</p></div>
-        <div class="viz up" data-s="2" style="flex:1;min-height:calc(12*var(--u))"><svg id="curv-bars" role="img" aria-label="Bar comparison of c over d versus slope-difference curvature"></svg></div>
-        <p class="small up" data-s="4" style="color:var(--ink2)">The broken signal put 84.6% of corner weight on “entry” and 7.8% on “apex”. The CEM responded rationally — it switched the racing line off. We fixed the sensor model, not the search.</p>
-      </div>
-    </div>
-  </div>
-  <aside class="notes"><p>For a turn of radius R, the centre line's sideways offset at distance d grows like d²/2R. Dividing by d still leaves d/2R — it rises with distance even though the curve is constant.</p><p>Second differences kill both the constant (lateral offset) and the linear term (heading error), leaving 1/R. After the fix the GA's first ten generations went from 10 s to 9.4 s.</p></aside>
-</section>
-
-<section class="slide" id="s-surprises" data-when="08-28 12:00|09-01 23:59" data-steps="5">
-  <div class="frame">
-    <header class="sh"><div class="lab">Failures &amp; surprises</div><h2>Six surprises that changed our direction</h2><span class="when">from the 52-row decision log</span></header>
-    <div class="tscroll">
-      <table class="t">
-        <thead><tr><th>When</th><th>What surprised us</th><th>What we changed</th><th>Effect</th></tr></thead>
-        <tbody>
-          <tr data-s="0"><td class="when-c">Aug 28</td><td>One negative-throttle tick latches the drivetrain: engine force stays at zero until the car nearly stops — a ≈ 50 : 1 loss.</td><td>Coast (throttle 0) instead of braking in normal driving.</td><td><span class="st ok">+24% distance, a second lap</span></td></tr>
-          <tr data-s="1"><td class="when-c">Aug 28</td><td><i>c</i>/<i>d</i> isn't curvature; the CEM “collapsed” for a good reason.</td><td>Local curvature from slope differences; CEM → GA.</td><td><span class="st ok">9.57 → 9.00 s</span></td></tr>
-          <tr data-s="2"><td class="when-c">Aug 29–30</td><td>The score gets gamed: v8 crashed, recovered, then sprinted one 7.80 s lap; 5×10<sup>−15</sup> s of float noise decided a ranking; rounding split equal totals.</td><td>Count laps in integer ticks; three-lap and clean tiers before speed; best lap first.</td><td><span class="st ok">Only clean runs promoted</span></td></tr>
-          <tr data-s="3"><td class="when-c">Aug 30</td><td>All 30 seeds hit exactly 457 ticks (7.617 s). Re-ranking, a new lever, a wider launch box and the whole speed profile each moved nothing in 10+ generations.</td><td>Stop after 10 flat generations; reopen pinned bounds before inventing levers.</td><td><span class="st hold">A floor of the policy, not the search</span></td></tr>
-          <tr data-s="4"><td class="when-c">Aug 31</td><td>Ten seconds of human driving used a brake-turn drift the search had never been allowed to try.</td><td>Corridor boost + a short drift pulse, tuned by the GA.</td><td><span class="st ok">7.60 → 7.19 s, clean on 33 seeds</span></td></tr>
-          <tr data-s="5"><td class="when-c">Sep 1</td><td>Copying the human's sequence exactly (v29, v30) was safe — and slower.</td><td>Kept v27; archived v30 as a reproducible experiment.</td><td><span class="st no">+0.068 s mean best lap</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <aside class="notes"><p>If there is time for only one: row four. When every seed produced the identical 457-tick lap, more search was pointless — the controller's structure was the limit. That is what sent us back to the simulator to drive by hand.</p><p>Laptop surprise not on the table: each search worker held ~950 MB; runs slowed into swap and the MacBook thermally slept mid-run. We restarted searches every ten generations from checkpoints.</p></aside>
-</section>
-
 <section class="slide" id="s-race" data-when="08-31 12:00|09-01 23:59" data-steps="0">
   <div class="frame">
-    <header class="sh"><div class="lab">Evidence · representative race</div><h2>Seed 110, raced three ways</h2><span class="when">real simulator trajectories</span></header>
+    <header class="sh"><div class="lab">Evidence · representative race</div><h2>Seed 110, raced three ways</h2><span class="when">real simulator trajectories</span>
+      <p class="sh-lead">Same starting point, same physics, three drivers: our safe baseline, a human at the keyboard, and the controller we shipped.</p></header>
     <div class="stack tight">
       <div class="viz" style="flex:1"><svg id="race-svg" role="img" aria-label="Three cars replaying seed 110: baseline, human replay, and the final controller"></svg><div id="race-read" class="readouts"></div></div>
       <div class="viz" style="height:calc(8.2*var(--u))"><svg id="race-strip" role="img" aria-label="Throttle traces for the final controller and the human driver"></svg></div>
@@ -416,70 +349,31 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       </div>
     </div>
   </div>
-  <aside class="notes"><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27's drift pulse is five ticks long. The throttle strip shows it — v27 dips below zero for a blink, the human holds the brake.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:30 · no presses · leave by 4:20</b> — “Baseline, a human at the keyboard, and v27. Watch the first hairpin.”</p><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27's drift pulse is five ticks long. The throttle strip shows it — v27 dips below zero for a blink, the human holds the brake.</p></aside>
 </section>
-
-<section class="slide" id="s-results" data-when="08-31 12:00|09-02 23:59" data-steps="0">
-  <div class="frame">
-    <header class="sh"><div class="lab">Evidence · final results</div><h2>What we shipped, and what we didn't</h2><span class="when">lap times are means over the listed seeds</span></header>
-    <div class="stack">
-      <div class="tscroll">
-        <table class="t">
-          <thead><tr><th>Controller</th><th>Promoted</th><th class="n">Best lap</th><th class="n">First lap</th><th>Seeds &amp; cleanliness</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td><code>minimum_viable</code></td><td class="when-c">Aug 28</td><td class="n">19.50 s</td><td class="n">—</td><td>seed 110 · 14/14 clean at promotion</td><td><span class="st ok">safe submission</span></td></tr>
-            <tr><td>GA plateau · v19</td><td class="when-c">Aug 30</td><td class="n">7.617 s</td><td class="n">8.45 s</td><td>30/30 clean · soak 100/100 · head-to-head 19/20</td><td><span class="st ok">promoted</span></td></tr>
-            <tr><td>Corridor boost · v25</td><td class="when-c">Aug 31</td><td class="n">7.594 s</td><td class="n">8.43 s</td><td>30/30 clean · soak 100/100 clean</td><td><span class="st ok">promoted</span></td></tr>
-            <tr class="hl"><td><code>race_faster</code> · v27</td><td class="when-c">Aug 31</td><td class="n key">7.190 s</td><td class="n">8.160 s</td><td>5/5 live grading seeds clean · 33/33 search · soak 100/100 survived, 91 clean</td><td><span class="st hold">final controller</span></td></tr>
-            <tr><td>Human sequence · v30</td><td class="when-c">Sep 1</td><td class="n">7.256 s</td><td class="n">8.255 s</td><td>33/33 clean</td><td><span class="st no">not promoted</span></td></tr>
-            <tr><td><code>race_speedmax</code> · v26</td><td class="when-c">Aug 31</td><td class="n">—</td><td class="n">—</td><td>peak 36.4 m/s · damage 0.15–0.76 accepted</td><td><span class="st no">speed experiment</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="board">
-        <span class="lab">Leaderboard</span><span class="lead">Final placement: <span class="fill-in">rank __ of __</span></span>
-        <span class="lab">Sources</span><span class="small">search checkpoints, <code>faster-line-v27-gate/soak.json</code>, the Gradescope worker on seeds 110, 2026, 1893, 7656, 9340, and <code>scripts/controller_training/README.md</code>.</span>
-      </div>
-    </div>
-  </div>
-  <aside class="notes"><p>Point to the highlighted row: 7.190 s mean best lap and 8.160 s mean first lap on the five live grading seeds, every run clean, 3–4 laps each. On the 100-seed soak all survived; nine had small contact (0.48 s total).</p><p>Say the leaderboard placement here.</p></aside>
-</section>
-
 <section class="slide" id="s-learned" data-when="all" data-steps="2">
   <div class="frame">
-    <header class="sh"><div class="lab">Learning</div><h2>Optimize the training, or optimize the model?</h2><span class="when">where the 21 seconds came from</span></header>
+    <header class="sh"><div class="lab">Learning</div><h2>What we learned — and the open question</h2><span class="when">where the 21 seconds came from</span>
+      <p class="sh-lead">Two things you can improve: the rules the car follows, or the way you search for the numbers inside them.</p></header>
     <div class="grid g-7-5">
       <div class="stack tight">
-        <div class="viz" style="flex:1"><svg id="learned-bars" role="img" aria-label="Seconds gained by search versus by new controller structure, in three phases"></svg></div>
-        <p class="small">Each promoted version is classed by what was new in it. Structural versions were still tuned by the GA.</p>
+        <div class="viz" style="flex:1"><svg id="learned-bars" role="img" aria-label="Seconds gained by search versus by new behaviour, in three phases"></svg></div>
       </div>
       <div class="stack">
-        <ul class="pts small up" data-s="1" style="color:var(--ink2)">
-          <li><b>Search harvests slack; structure moves floors.</b> Search alone took the safe car from 28 to 15.5 s. Below 7.9 s, 84% of the gain came from new behaviour.</li>
-          <li><b>The objective is the specification.</b> Every loophole in our ranking was found and exploited.</li>
-          <li><b>Robustness is designed.</b> Held-out seeds, default-off levers and clean promotion gates — never one lucky run.</li>
-          <li><b>Follow curiosity.</b> Both biggest structural wins — coasting and drifting — began as a human “why?”.</li>
+        <ul class="pts big up" data-s="1" style="color:var(--ink2)">
+          <li>Search bought the early seconds; new behaviour bought the last ones.</li>
+          <li>Whatever you score is what you get.</li>
+          <li>Test on starts you never tuned on.</li>
+          <li>Our best ideas came from driving the car ourselves.</li>
         </ul>
-        <blockquote class="q up" data-s="2">If this isn't a model that is trained, is this just being brute-forced and reasoned via an agent loop?<cite>— Zhi, to Claude Code, Aug 31</cite></blockquote>
       </div>
     </div>
-  </div>
-  <aside class="notes"><p>This is our main learning. "Optimizing the training" — better optimizer, better objective, wider bounds — was worth a lot early and nothing at the plateau. "Optimizing the model" — adding a behaviour the policy could express — was what moved the floor.</p><p>The quote is honest: our controller is a hand-structured policy whose numbers were learned. A neural policy would learn the structure too, but would need far more data; that trade-off is the next slide's question.</p></aside>
-</section>
-
-<section class="slide" id="s-question" data-when="all" data-steps="3">
-  <div class="frame">
-    <header class="sh"><div class="lab">Open question</div><h2>Is Codex a more efficient learner than traditional ML?</h2><span class="when">three learners, three currencies</span></header>
-    <div class="stack" style="gap:calc(2.2*var(--u))">
-      <div class="ledger">
-        <div class="up" data-s="0"><div class="lab c-blue">Genetic algorithm</div><div class="hero-n">570,000</div><div class="hero-u">30-second races · ≈ 198 days of simulated driving</div><p>Learned values for 1–20 numbers at a time. Refined every structure it was handed, then flat-lined at 457 ticks.</p></div>
-        <div class="up" data-s="1"><div class="lab c-yellow">AI agents</div><div class="hero-n">504 M</div><div class="hero-u">tokens processed · 15.9 M fresh · 2.0 M written</div><p>Learned hypotheses: 30 search spaces, 10 rewrites of the ranking, one geometry bug, 12 new behaviours (3 rejected). Could not judge any idea without the simulator.</p></div>
-        <div class="up" data-s="2"><div class="lab c-brown">Human</div><div class="hero-n">10.4 s</div><div class="hero-u">of driving · 626 ticks · a handful of questions</div><p>Learned a prior: brake to rotate, never brake to slow. It seeded the 0.41 s drift — the largest late gain.</p></div>
-      </div>
-      <p class="lead up" data-s="3" style="max-width:60em">Our tentative answer: they learn in different spaces. The GA searches parameters, the agent searches structure and objectives, and the human supplies priors. Per sample the human wins; per hour, the agent; for the last hundredth, the GA. None reached 7.19 s alone.</p>
+    <div class="closing up" data-s="2">
+      <span class="stat">570,000 races</span><span class="stat">504 M tokens</span><span class="stat">10.4 s of driving</span>
+      <span class="q-line"><b class="c-yellow">Open question: is Codex a more efficient learner than traditional ML?</b> Three learners, three currencies — and none of them reached 7.19 s alone.</span>
     </div>
   </div>
-  <aside class="notes"><p>Frame it as a question for the room, not a verdict. The units differ on purpose: races, tokens, seconds of driving. Note that 97% of the agent tokens were the conversation re-reading itself (cache), so "fresh" tokens are the fairer comparison.</p><p>Discussion prompt: what would it take for an agent to generate its own "human laps" — to play the game rather than read about it?</p></aside>
+  <aside class="notes"><p class="cue"><b>0:50 · 2 presses · finish by 5:10</b> — “Early, search bought the seconds; late, only new behaviour did. Which leaves our open question: is Codex a more efficient learner than traditional ML? 570,000 races, 504 million tokens, ten seconds of human driving — three currencies, and none of them got there alone.”</p><p>The bars classify each promoted version by what was new in it; structural versions were still tuned by the search.</p><p>End on the question, not a verdict. The units differ on purpose. If asked: 97% of the agent tokens were the conversation re-reading itself, so 15.9 M is the fairer number.</p></aside>
 </section>
 
 </div>
@@ -968,16 +862,12 @@ const PTS = J.points.slice().sort((a, b) => a.t - b.t);
 const REJ = [{ t: edtEpoch(8, 28, 20, 18), lap: 9.65, v: 'v2 CEM gate', label: 'CEM gate' }].concat(J.rejected);
 const QUOTE = i => J.prompts[i].text;
 const BEATS = [
-  { T: edtEpoch(8, 28, 12, 50), z: 0, date: 'Aug 26 – 28', title: 'Chats as generations', text: 'Each band under the axis is one conversation with an agent — Codex in blue, Claude Code in purple. For the first 45 M tokens the car hadn’t turned a wheel: we explored the repo, planned imitation learning, then wrote plan.md.', stat: '20 chats · 504 M tokens' },
-  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 28 · midday', title: 'First, a car that finishes', text: 'A hand-tuned centre-line controller ran one 28.2 s lap, clean on 14 of 14 seeds. Twenty CEM generations on its 12 gains: 23.75 s. (Until a car laps twice, its only lap is its best lap.)', stat: '28.2 → 23.75 s' },
-  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'CEM on 14 gains of the same controller for 84 generations. We stopped when 8 of 14 deviations had collapsed onto their floor.', stat: '15.5 s' },
-  { T: edtEpoch(8, 28, 17, 47), key: 'CEM · faster-line', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', text: 'One negative-throttle tick latches the drivetrain. Coasting instead of braking, plus an outside–inside–outside line: +24% distance and a second lap.', stat: '9.57 s' },
-  { T: edtEpoch(8, 28, 23, 32), key: 'v2', z: 0, date: 'Aug 28 · night', title: 'CEM out, GA in', text: 'The CEM gate (red) collapsed onto a broken curvature signal — the failure slide explains it. With local curvature fixed, a genetic algorithm reached 9.4 s in ten generations and 9.0 s in forty.', stat: '9.00 s' },
-  { T: edtEpoch(8, 29, 17, 38), key: 'v5', z: 0, date: 'Aug 29', title: 'Move the box, not the search', text: 'v3–v5 reopened bounds the elites were pinned against and added one structural gene: the line may snap back to centre faster than it moves out. Searches ran from the terminal; the agent watched memory.', stat: '7.90 s' },
-  { T: edtEpoch(8, 29, 23, 20), key: 'v9', prompt: 1, z: 0, date: 'Aug 29 · night', title: 'Rank what you mean', text: 'Ranking on lap time exposed exploits: v8 (red) crashed, recovered, then set one fast lap. Three-lap and clean tiers now come before speed — and that question became our ten-flat-generations rule.', stat: '7.78 s' },
-  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', text: 'Launch cap, sweeper boost, reopened bounds: 7.617 s — exactly 457 ticks on all 30 seeds. Then v17, v18, v20, v22 and v24 each improved nothing.', stat: '457 ticks' },
-  { T: edtEpoch(8, 31, 23, 50), key: 'v27', prompt: 3, z: 1, date: 'Aug 31', title: 'Play the game', text: '“Think about drifting…”, then ten seconds of recorded human driving: a corridor boost followed by a 0.15 s brake-turn pulse into the next corner. Clean on all 33 seeds.', stat: '7.183 s' },
-  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 4, z: 1, date: 'Sep 1 – 2', title: 'Copy the idea, not the trajectory', text: 'Replaying the human’s full sequence — rotate, carry, hold, settle — was safe on 33 seeds but 0.068 s slower (red). v27 stayed. Now flip the x-axis above.', stat: 'v27 kept' },
+  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 26 – 28', title: 'Chats as generations', text: 'Each band under the axis is one conversation with an agent — Codex in blue, Claude Code in purple. Forty-five million tokens went by before the car turned a wheel; then a hand-tuned controller ran one 28.2 s lap, and twenty rounds of search made it 23.75 s.', stat: '28.2 → 23.75 s' },
+  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'Eighty-four rounds of search over the same fourteen numbers. We stopped when it stopped improving.', stat: '15.5 s' },
+  { T: edtEpoch(8, 28, 23, 32), key: 'v2', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', surprise: 'Braking switched the engine off until the car had nearly stopped — a fifty-to-one loss we never suspected.', text: 'Coasting instead of braking, plus a proper racing line: 24% more distance and a second lap.', stat: '9.57 → 9.00 s' },
+  { T: edtEpoch(8, 29, 23, 20), key: 'v9', z: 0, date: 'Aug 29', title: 'Widen the limits, fix the score', surprise: 'Our first genuinely fast candidate (red) crashed, recovered, then sprinted one good lap — and won on points. So we scored three laps instead of one and demanded a clean run before rewarding speed.', text: 'We also widened limits the winners kept bumping into.', stat: '7.78 s' },
+  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', surprise: 'Every starting point came back with exactly the same lap, and five versions in a row improved nothing at all. The limit was the car itself, not the search.', text: 'A launch limit, a boost through the long sweeper and wider limits had taken it to 7.617 s — and there it stopped.', stat: '7.617 s' },
+  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 3, z: 1, date: 'Aug 31 – Sep 1', title: 'Play the game', text: 'Ten seconds of one of us driving by hand showed a move the search had never been allowed to try: a boost down the corridor, then a hard brake into the corner to rotate the car. Clean from all 33 starts. Copying the whole human sequence (red), though, came out slower.', stat: '7.183 s' },
 ];
 
 HOOKS['s-journey'] = {
@@ -1008,7 +898,7 @@ HOOKS['s-journey'] = {
     const plot = S('g', { 'clip-path': 'url(#jr-clip)' }, svg);
     this.plateau = S('g', {}, plot);
     this.plLine = S('line', { stroke: COL.mute, 'stroke-dasharray': '5 5', 'stroke-width': 1.2 }, this.plateau);
-    this.plText = S('text', { 'font-size': 13, class: 'tx-mute', text: '457 ticks = 7.617 s · every seed, v16 → v24' }, this.plateau);
+    this.plText = S('text', { 'font-size': 13, class: 'tx-mute', text: '7.617 s — the same lap from every start' }, this.plateau);
     this.curve = S('path', { fill: 'none', stroke: COL.blue, 'stroke-width': 2.6, 'stroke-linejoin': 'round' }, plot);
     this.dots = PTS.map(p => {
       const c = S('circle', { r: 3.4, fill: COL.blue }, plot);
@@ -1018,9 +908,9 @@ HOOKS['s-journey'] = {
     this.rej = REJ.map(r => {
       const g = S('g', {}, plot);
       S('circle', { r: 6.5, fill: COL.bg, stroke: COL.red, 'stroke-width': 2 }, g);
-      S('text', { x: 10, y: -8, 'font-size': 13, fill: COL.red, text: r.label }, g);
+      const t = S('text', { x: 10, y: -8, 'font-size': 13, fill: COL.red, text: r.label }, g);
       S('title', { text: `${r.v} · ${r.lap.toFixed(3)} s · rejected: ${r.label}` }, g);
-      return { r, g };
+      return { r, g, t };
     });
     this.prompts = J.prompts.map(p => {
       const g = S('g', {}, svg);
@@ -1090,9 +980,17 @@ HOOKS['s-journey'] = {
     const last = vis[vis.length - 1];
     this.end.setAttribute('opacity', last ? 1 : 0);
     if (last) { this.end.setAttribute('cx', this.X(last.t)); this.end.setAttribute('cy', this.Y(last.lap)); }
-    this.rej.forEach(({ r, g }) => {
-      g.setAttribute('transform', `translate(${this.X(r.t).toFixed(1)},${this.Y(r.lap).toFixed(1)})`);
+    const placed = [];
+    this.rej.forEach(({ r, g, t }) => {
+      const x = this.X(r.t), y = this.Y(r.lap);
+      g.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`);
       g.setAttribute('opacity', r.t <= s.rev ? 1 : 0);
+      const flip = x > this.R - 260; // keep long labels inside the plot
+      t.setAttribute('x', flip ? -10 : 10);
+      t.setAttribute('text-anchor', flip ? 'end' : 'start');
+      const crowded = placed.some(p => Math.abs(p[0] - x) < 160 && Math.abs(p[1] - y) < 26);
+      t.setAttribute('y', crowded ? 20 : -8);
+      placed.push([x, y]);
     });
     const pb = BEATS[s.beat].prompt;
     this.prompts.forEach(({ p, g }, i) => {
@@ -1101,7 +999,7 @@ HOOKS['s-journey'] = {
     });
     const ply = this.Y(7.6167), plx = this.X(edtEpoch(8, 30, 20, 35));
     this.plLine.setAttribute('x1', plx); this.plLine.setAttribute('x2', R); this.plLine.setAttribute('y1', ply); this.plLine.setAttribute('y2', ply);
-    this.plText.setAttribute('x', Math.min(plx + 8, R - 290)); this.plText.setAttribute('y', ply - 8);
+    this.plText.setAttribute('x', Math.min(plx + 8, R - 250)); this.plText.setAttribute('y', ply - 8);
     this.plateau.setAttribute('opacity', s.z > 0.5 && s.rev >= edtEpoch(8, 30, 20, 35) ? s.z : 0);
     const kb = BEATS[s.beat].key, kp = kb && PTS.filter(p => p.v === kb).pop();
     this.ring.setAttribute('opacity', kp && kp.t <= s.rev ? 1 : 0);
@@ -1112,6 +1010,7 @@ HOOKS['s-journey'] = {
     this.panel.innerHTML =
       `<div class="jr-date">${b.date} · beat ${k + 1} of ${BEATS.length}</div><h3>${b.title}</h3>` +
       (p ? `<blockquote class="q">${p.text}<cite>— Zhi, to Codex · ${fmtDay(p.t)}, ${fmtHM(p.t)}</cite></blockquote>` : '') +
+      (b.surprise ? `<div class="surprise"><span class="lab">The surprise</span><p>${b.surprise}</p></div>` : '') +
       `<p>${b.text}</p><div class="spacer"></div><div class="jr-stat">${b.stat}</div>`;
   },
   step(k) {
@@ -1174,6 +1073,48 @@ const RIBBON = {
   },
 };
 window.RIBBON = RIBBON;
+
+/* ================= what a controller is ================= */
+HOOKS['s-what'] = {
+  init(sl) {
+    const svg = sl.querySelector('#what-svg');
+    svg.setAttribute('viewBox', '-30 0 580 430');
+    const mk = S('marker', { id: 'what-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto' }, S('defs', {}, svg));
+    S('path', { d: 'M0 0 L10 5 L0 10 z', fill: COL.line2 }, mk);
+    const c = [260, 210], R = 128;
+    const pt = deg => [c[0] + R * Math.cos((deg - 90) * Math.PI / 180), c[1] + R * Math.sin((deg - 90) * Math.PI / 180)];
+    const nodes = [[0, 'Sense', 'what is just ahead?', COL.blue], [120, 'Decide', 'aim where, how fast?', COL.yellow], [240, 'Act', 'throttle and steering', COL.green]];
+    nodes.forEach(([deg]) => {
+      const a = pt(deg + 18), b = pt(deg + 102);
+      S('path', {
+        d: `M${a[0].toFixed(1)} ${a[1].toFixed(1)} A ${R} ${R} 0 0 1 ${b[0].toFixed(1)} ${b[1].toFixed(1)}`,
+        fill: 'none', stroke: COL.line2, 'stroke-width': 2, 'marker-end': 'url(#what-arrow)', class: 'draw', 'data-s': 0,
+      }, svg);
+    });
+    nodes.forEach(([deg, title, sub, col]) => {
+      const p = pt(deg);
+      S('circle', { cx: p[0], cy: p[1], r: 10, fill: col, stroke: COL.bg, 'stroke-width': 3 }, svg);
+      const anchor = deg === 0 ? 'middle' : deg === 120 ? 'start' : 'end';
+      const dx = deg === 0 ? 0 : deg === 120 ? 24 : -24;
+      const dy = deg === 0 ? -30 : 6;
+      S('text', { x: p[0] + dx, y: p[1] + dy, 'font-size': 21, 'text-anchor': anchor, class: 'tx-ink', text: title }, svg);
+      S('text', { x: p[0] + dx, y: p[1] + dy + 23, 'font-size': 15, 'text-anchor': anchor, text: sub }, svg);
+    });
+    S('text', { x: c[0], y: c[1] - 4, 'font-size': 36, 'text-anchor': 'middle', class: 'tx-ink', text: '60×' }, svg);
+    S('text', { x: c[0], y: c[1] + 24, 'font-size': 16, 'text-anchor': 'middle', text: 'a second' }, svg);
+    S('text', { x: c[0], y: c[1] + 46, 'font-size': 13, 'text-anchor': 'middle', text: '16.7 ms per decision' }, svg);
+    this.dot = S('circle', { r: 7, fill: COL.ink, stroke: COL.bg, 'stroke-width': 2 }, svg);
+    this.c = c; this.R = R; this.t = 0;
+    this.place();
+  },
+  place() {
+    const a = (this.t * 80 - 90) * Math.PI / 180;
+    this.dot.setAttribute('cx', this.c[0] + this.R * Math.cos(a));
+    this.dot.setAttribute('cy', this.c[1] + this.R * Math.sin(a));
+  },
+  enter() { if (ENV.reduce) return; this.loop = dt => { this.t += dt; this.place(); }; addLoop(this.loop); },
+  leave() { if (this.loop) removeLoop(this.loop); },
+};
 
 /* ================= task schematic ================= */
 HOOKS['s-task'] = {
@@ -1473,14 +1414,14 @@ HOOKS['s-learned'] = {
     const svg = sl.querySelector('#learned-bars');
     svg.setAttribute('viewBox', '0 0 640 330');
     const rows = [
-      { label: '28.2 → 9.0 s', when: 'Aug 28', s: 12.70, n: 6.50, sv: 'hand-tuned → CEM ×2', nv: 'coasting + racing line, curvature fix' },
-      { label: '9.0 → 7.9 s', when: 'Aug 29', s: 0.483, n: 0.617, sv: 'v3, v5 bounds', nv: 'v4 line-release gene' },
-      { label: '7.9 → 7.18 s', when: 'Aug 29–31', s: 0.116, n: 0.600, sv: 'v7, v9 objectives', nv: 'launch cap, sweeper ×2, corridor, drift' },
+      { label: '28.2 → 9.0 s', when: 'Aug 28', s: 12.70, n: 6.50, sv: 'two rounds of tuning', nv: 'coasting and a racing line' },
+      { label: '9.0 → 7.9 s', when: 'Aug 29', s: 0.483, n: 0.617, sv: 'wider limits', nv: 'a new steering rule' },
+      { label: '7.9 → 7.18 s', when: 'Aug 29–31', s: 0.116, n: 0.600, sv: 'better scoring', nv: 'launch limit, sweeper boost, drift' },
     ];
     const L = 150, R = 630;
     const lg = S('g', { transform: 'translate(150,14)' }, svg);
-    S('rect', { x: 0, y: -9, width: 14, height: 10, rx: 2, fill: COL.blue }, lg); S('text', { x: 20, y: 0, 'font-size': 13, class: 'tx-ink', text: 'search inside a fixed controller' }, lg);
-    S('rect', { x: 238, y: -9, width: 14, height: 10, rx: 2, fill: COL.yellow }, lg); S('text', { x: 258, y: 0, 'font-size': 13, class: 'tx-ink', text: 'new structure: behaviour, feature, fix' }, lg);
+    S('rect', { x: 0, y: -9, width: 14, height: 10, rx: 2, fill: COL.blue }, lg); S('text', { x: 20, y: 0, 'font-size': 13, class: 'tx-ink', text: 'searching for better numbers' }, lg);
+    S('rect', { x: 238, y: -9, width: 14, height: 10, rx: 2, fill: COL.yellow }, lg); S('text', { x: 258, y: 0, 'font-size': 13, class: 'tx-ink', text: 'new behaviour we added' }, lg);
     rows.forEach((r, i) => {
       const y = 46 + i * 94, tot = r.s + r.n, xs = L + (r.s / tot) * (R - L);
       S('text', { x: L - 12, y: y + 20, 'font-size': 16, 'text-anchor': 'end', class: 'tx-ink', text: r.label }, svg);
