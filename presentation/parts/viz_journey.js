@@ -16,46 +16,37 @@ const T0 = edtEpoch(8, 26, 12, 0), T1 = edtEpoch(9, 2, 14, 0);
 const DAYS = []; for (let d = 27; d <= 33; d++) DAYS.push(d <= 31 ? edtEpoch(8, d, 0, 0) : edtEpoch(9, d - 31, 0, 0));
 const MODES = {
   tok: { f: fTok, d: [0, 510], ticks: [0, 100, 200, 300, 400, 500], fmt: v => (v ? v + ' M' : '0'), title: 'agent tokens processed (millions) — 97% are cached re-reads of the conversation' },
-  time: { f: t => t, d: [T0, T1], ticks: DAYS, fmt: fmtDay, title: 'calendar time (EDT)' },
+  time: { f: t => t, d: [edtEpoch(8, 28, 6, 0), edtEpoch(9, 2, 4, 0)], ticks: [28, 29, 30, 31, 32].map(d => (d <= 31 ? edtEpoch(8, d, 12, 0) : edtEpoch(9, d - 31, 12, 0))), fmt: fmtDay, title: 'date (EDT)' },
   trials: { f: fTrial, d: [0, 580000], ticks: [0, 1e5, 2e5, 3e5, 4e5, 5e5], fmt: v => (v ? v / 1000 + 'k' : '0'), title: 'simulated 30-second races — ≈ 198 days of driving in total' },
 };
 const PTS = J.points.slice().sort((a, b) => a.t - b.t);
 const REJ = [{ t: edtEpoch(8, 28, 20, 18), lap: 9.65, v: 'v2 CEM gate', label: 'CEM gate' }].concat(J.rejected);
+REJ.forEach(r => { r.below = /crash|launch/.test(r.label); }); // the curve runs just above these two
 const QUOTE = i => J.prompts[i].text;
 const BEATS = [
-  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 26 – 28', title: 'Chats as generations', text: 'Each band under the axis is one conversation with an agent — Codex in blue, Claude Code in purple. Forty-five million tokens went by before the car turned a wheel; then a hand-tuned controller ran one 28.2 s lap, and twenty rounds of search made it 23.75 s.', stat: '28.2 → 23.75 s' },
-  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'Eighty-four rounds of search over the same fourteen numbers. We stopped when it stopped improving.', stat: '15.5 s' },
-  { T: edtEpoch(8, 28, 23, 32), key: 'v2', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', surprise: 'Braking switched the engine off until the car had nearly stopped — a fifty-to-one loss we never suspected.', text: 'Coasting instead of braking, plus a proper racing line: 24% more distance and a second lap.', stat: '9.57 → 9.00 s' },
-  { T: edtEpoch(8, 29, 23, 20), key: 'v9', z: 0, date: 'Aug 29', title: 'Widen the limits, fix the score', surprise: 'Our first genuinely fast candidate (red) crashed, recovered, then sprinted one good lap — and won on points. So we scored three laps instead of one and demanded a clean run before rewarding speed.', text: 'We also widened limits the winners kept bumping into.', stat: '7.78 s' },
-  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', surprise: 'Every starting point came back with exactly the same lap, and five versions in a row improved nothing at all. The limit was the car itself, not the search.', text: 'A launch limit, a boost through the long sweeper and wider limits had taken it to 7.617 s — and there it stopped.', stat: '7.617 s' },
-  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 3, z: 1, date: 'Aug 31 – Sep 1', title: 'Play the game', text: 'Ten seconds of one of us driving by hand showed a move the search had never been allowed to try: a boost down the corridor, then a hard brake into the corner to rotate the car. Clean from all 33 starts. Copying the whole human sequence (red), though, came out slower.', stat: '7.183 s' },
+  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 28', title: 'A car that finishes', text: 'Our first controller simply followed the middle of the track: one lap took 28.2 seconds. Twenty rounds of search on its settings brought that down to 23.75 s.', stat: '28.2 → 23.75 s' },
+  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'Eighty-four rounds of search over fourteen parameters — target speeds, steering strengths, braking distances. We stopped when it stopped improving.', stat: '15.5 s' },
+  { T: edtEpoch(8, 28, 23, 32), key: 'v2', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', surprise: 'Tapping the brake put the car into ‘about to reverse’ mode: until it had nearly stopped, pressing the accelerator only braked harder.', text: 'So the car now lets go of the accelerator and coasts instead, and takes a proper racing line: 24% more distance and a second lap. A first search method was rejected (red); a genetic algorithm took it to 9.0 s.', stat: '9.57 → 9.00 s' },
+  { T: edtEpoch(8, 29, 23, 20), key: 'v9', z: 0, date: 'Aug 29', title: 'The score got gamed', surprise: 'The top-scoring car (red) hit a wall, limped along, then set one fast lap. Once a car survived, our score ranked it by its single best lap — so it won.', text: 'We changed the score so a car must finish three laps without damage before its speed is compared. And where the best results kept landing on the edge of a parameter’s allowed range, we widened the range.', stat: '7.78 s' },
+  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', surprise: 'Every starting point came back with exactly the same lap, and five versions in a row improved nothing. The limit was the car’s rules, not the search.', text: 'Three changes got it here: capping speed for the first two seconds so it didn’t overshoot the first corner, adding speed through the track’s one long, steady bend, and widening the search ranges again.', stat: '7.617 s' },
+  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 3, z: 1, date: 'Aug 31 – Sep 1', title: 'Play the game', text: 'Ten seconds of one of us driving by hand showed a move the search had never been allowed to try: full speed down the long straight, then brake hard into the corner to swing the car round. Clean from all 33 starts. Copying the whole human sequence (red), though, came out slower.', stat: '7.183 s' },
 ];
 
 HOOKS['s-journey'] = {
   init(sl) {
     const svg = this.svg = sl.querySelector('#jr-svg');
-    const W = 1000, Hh = 660; this.L = 66; this.R = 985; this.T = 16; this.B = 524;
+    const W = 1000, Hh = 585; this.L = 66; this.R = 985; this.T = 16; this.B = 524;
     svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
     const defs = S('defs', {}, svg);
     const cp = S('clipPath', { id: 'jr-clip' }, defs);
-    S('rect', { x: this.L, y: this.T - 8, width: this.R - this.L + 8, height: this.B - this.T + 8 }, cp);
+    S('rect', { x: this.L, y: this.T - 8, width: this.R - this.L, height: this.B - this.T + 8 }, cp);
     this.gY = S('g', {}, svg);
     this.gX = S('g', {}, svg);
     S('line', { x1: this.L, x2: this.R, y1: this.B, y2: this.B, class: 'ax' }, svg);
-    S('text', { x: this.L - 10, y: this.B + 38, 'font-size': 13, 'text-anchor': 'end', text: 'Codex' }, svg);
-    S('text', { x: this.L - 10, y: this.B + 56, 'font-size': 13, 'text-anchor': 'end', text: 'Claude Code' }, svg);
-    this.xTitle = S('text', { x: (this.L + this.R) / 2, y: this.B + 110, 'font-size': 14, 'text-anchor': 'middle', class: 'tx-mute' }, svg);
+    this.xTitle = S('text', { x: (this.L + this.R) / 2, y: this.B + 54, 'font-size': 14, 'text-anchor': 'middle', class: 'tx-mute' }, svg);
     S('text', { x: 4, y: this.T + 4, 'font-size': 13, class: 'tx-mute', text: 'best lap' }, svg);
-    // chat bands
-    this.chats = J.chats.map((c, i) => {
-      const y = c.agent === 'codex' ? this.B + 27 : this.B + 45;
-      const g = S('g', {}, svg);
-      const r = S('rect', { y, height: 13, rx: 2, fill: c.agent === 'codex' ? COL.blue : COL.purple, 'fill-opacity': 0.55, stroke: COL.bg, 'stroke-width': 1 }, g);
-      S('title', { text: `Chat ${i + 1} · ${c.name} · ${fmtDay(c.t0)} ${fmtHM(c.t0)} · ${c.total.toFixed(1)} M tokens` }, r);
-      const tx = S('text', { y: y - 3, 'font-size': 11, 'text-anchor': 'middle', class: 'tx-mute', text: String(i + 1) }, g);
-      return { c, r, tx };
-    });
+    this.chats = [];
     const plot = S('g', { 'clip-path': 'url(#jr-clip)' }, svg);
     this.plateau = S('g', {}, plot);
     this.plLine = S('line', { stroke: COL.mute, 'stroke-dasharray': '5 5', 'stroke-width': 1.2 }, this.plateau);
@@ -87,8 +78,7 @@ HOOKS['s-journey'] = {
     S('path', { d: 'M212 -6 L217 0 L212 6 L207 0 Z', fill: COL.brown }, lg); S('text', { x: 223, y: 4.5, 'font-size': 13, text: 'our question' }, lg);
 
     this.panel = sl.querySelector('#jr-panel');
-    this.st = { mode: 'tok', from: 'tok', mk: 1, z: 0, rev: BEATS[0].T, beat: 0 };
-    ['tok', 'time', 'trials'].forEach(m => sl.querySelector('#jr-x-' + m).addEventListener('click', () => this.setMode(m)));
+    this.st = { mode: 'time', from: 'time', mk: 1, z: 0, rev: BEATS[0].T, beat: 0 };
     this.render();
     this.fillPanel(0);
   },
@@ -114,7 +104,7 @@ HOOKS['s-journey'] = {
       M.ticks.forEach(v => {
         const x = L + (v - M.d[0]) / (M.d[1] - M.d[0]) * (R - L);
         S('line', { x1: x, x2: x, y1: this.B, y2: this.B + 5, class: 'ax', opacity: op }, this.gX);
-        S('text', { x, y: this.B + 86, 'font-size': 13, 'text-anchor': 'middle', opacity: op, text: M.fmt(v) }, this.gX);
+        S('text', { x, y: this.B + 26, 'font-size': 13, 'text-anchor': 'middle', opacity: op, text: M.fmt(v) }, this.gX);
       });
     });
     this.xTitle.textContent = MODES[s.mode].title;
@@ -150,7 +140,8 @@ HOOKS['s-journey'] = {
       t.setAttribute('x', flip ? -10 : 10);
       t.setAttribute('text-anchor', flip ? 'end' : 'start');
       const crowded = placed.some(p => Math.abs(p[0] - x) < 160 && Math.abs(p[1] - y) < 26);
-      t.setAttribute('y', crowded ? 20 : -8);
+      const base = r.below ? 22 : -8;
+      t.setAttribute('y', crowded ? base + 18 : base);
       placed.push([x, y]);
     });
     const pb = BEATS[s.beat].prompt;
@@ -170,7 +161,7 @@ HOOKS['s-journey'] = {
     const b = BEATS[k], p = b.prompt != null ? J.prompts[b.prompt] : null;
     this.panel.innerHTML =
       `<div class="jr-date">${b.date} · beat ${k + 1} of ${BEATS.length}</div><h3>${b.title}</h3>` +
-      (p ? `<blockquote class="q">${p.text}<cite>— Zhi, to Codex · ${fmtDay(p.t)}, ${fmtHM(p.t)}</cite></blockquote>` : '') +
+      (p ? `<blockquote class="q">${p.text}<cite>— Zhi · ${fmtDay(p.t)}, ${fmtHM(p.t)}</cite></blockquote>` : '') +
       (b.surprise ? `<div class="surprise"><span class="lab">The surprise</span><p>${b.surprise}</p></div>` : '') +
       `<p>${b.text}</p><div class="spacer"></div><div class="jr-stat">${b.stat}</div>`;
   },

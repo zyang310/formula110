@@ -130,6 +130,18 @@ HOOKS['s-controller'] = {
 
     // 1 · lookahead at the tightest corner: car 14 m before max turning angle
     const n = TRK.n, P = TRK.P;
+    // keep the lookahead illustration away from the corner where the drift happens
+    let driftI = -1;
+    {
+      const thr0 = p.meta.thr, f0 = Math.round(c[0] * 60), f1 = Math.round(c[1] * 60);
+      for (let t = f0; t <= f1 && driftI < 0; t++) {
+        if (thr0[t] >= 0) continue;
+        const q = posAt(p, t / 60);
+        let bd0 = 1e18;
+        P.forEach((pp, j) => { const d = Math.hypot(pp[0] - q[0], pp[1] - q[1]); if (d < bd0) { bd0 = d; driftI = j; } });
+      }
+    }
+    const nearDrift = i => driftI >= 0 && Math.min(Math.abs(i - driftI), n - Math.abs(i - driftI)) < 30;
     let best = 0, bi = 0;
     for (let i = 0; i < n; i++) {
       let a = 0;
@@ -139,7 +151,7 @@ HOOKS['s-controller'] = {
         let d = h2 - h1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
         a += Math.abs(d);
       }
-      if (a > best) { best = a; bi = i; }
+      if (a > best && !nearDrift(i)) { best = a; bi = i; }
     }
     const walk = (i, dist) => { // walk along centre line by dist units (signed)
       let j = i, acc = 0; const dir = dist >= 0 ? 1 : -1;
@@ -180,7 +192,7 @@ HOOKS['s-controller'] = {
     clusters.forEach(([a, b]) => {
       const q = posAt(p, (a + b) / 120);
       S('circle', { cx: q[0], cy: q[1], r: 34, fill: 'none', stroke: COL.ink, 'stroke-width': 1.6, 'stroke-dasharray': '4 4' }, g4);
-      S('text', { x: q[0] + 42, y: q[1] + 6, 'font-size': 18, class: 'tx-ink', text: `drift pulse · ${((b - a + 1) / 60).toFixed(2)} s` }, g4);
+      S('text', { x: q[0], y: q[1] + 60, 'font-size': 18, 'text-anchor': 'middle', class: 'tx-ink', text: 'drift' }, g4);
     });
     const lg = sl.querySelector('#ctrl-legend');
     lg.innerHTML = `<span><span class="sw" style="background:${COL.base}"></span>baseline, <code>minimum_viable</code></span>` +
@@ -201,26 +213,6 @@ HOOKS['s-race'] = {
       readRow(box, COL.brown, 'Human (Zhi), replayed'),
       readRow(box, COL.yellow, 'race_faster · v27'),
     ];
-    // throttle strip
-    const st = sl.querySelector('#race-strip');
-    const W = 1000, Hh = 92, X0 = 70, X1 = 930;
-    st.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
-    const xt = t => X0 + (t / 30) * (X1 - X0), yv = v => 38 - v * 28;
-    this.xt = xt;
-    S('line', { x1: X0, x2: X1, y1: yv(0), y2: yv(0), class: 'ax' }, st);
-    [1, -1].forEach(v => S('line', { x1: X0, x2: X1, y1: yv(v), y2: yv(v), class: 'gr' }, st));
-    [['+1', 1], ['0', 0], ['−1', -1]].forEach(([l, v]) => S('text', { x: X0 - 10, y: yv(v) + 5, 'font-size': 14, 'text-anchor': 'end', text: l }, st));
-    S('text', { x: 4, y: 20, 'font-size': 14, class: 'tx-ink', text: 'throttle' }, st);
-    for (let s = 0; s <= 30; s += 5) S('text', { x: xt(s), y: Hh - 2, 'font-size': 13, 'text-anchor': 'middle', text: s + ' s' }, st);
-    const line = (arr, col) => {
-      const pts = arr.map((v, i) => [xt(i / 60), yv(v / 100)]);
-      S('path', { d: openD(pts), fill: 'none', stroke: col, 'stroke-width': 1.6, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' }, st);
-    };
-    line(DATA.paths.human.thr, COL.brown);
-    line(DATA.paths.v27.thr, COL.yellow);
-    S('text', { x: X1 + 8, y: yv(0.95) + 5, 'font-size': 13, text: 'v27', fill: COL.ink2 }, st);
-    S('text', { x: xt(10.5) + 6, y: yv(-0.8), 'font-size': 13, text: 'human ends', fill: COL.ink2 }, st);
-    this.head = S('line', { y1: 4, y2: 74, stroke: COL.ink, 'stroke-width': 1.2 }, st);
 
     this.t = 0; this.rate = 1; this.playing = true; this.hold = 0;
     const $ = id => sl.querySelector('#' + id);
@@ -246,8 +238,6 @@ HOOKS['s-race'] = {
       if (n) s += ' · lap ' + laps.slice(0, n).map(x => x.toFixed(2) + ' s').join(', ');
       this.rows[i].textContent = s;
     });
-    const x = this.xt(t).toFixed(1);
-    this.head.setAttribute('x1', x); this.head.setAttribute('x2', x);
     this.scrub.value = t.toFixed(2);
     this.lbl.textContent = t.toFixed(1) + ' s';
   },

@@ -18,31 +18,30 @@ press →, the clock time to leave by, and the line to say.
 | # | Slide | Presses | Time | What you say |
 | --- | --- | --- | --- | --- |
 | 1 | The 7.19-second lap | 0 | 0:15 | "Same track, same start. Grey was our first safe car, yellow is what we shipped: 28 seconds down to 7.19." |
-| 2 | What a controller is | 3 | 0:35 | "It's a function, sixty times a second. No map, no plan. Ours follows rules we wrote — and a search found the numbers inside them." |
+| 2 | What a controller is | 3 | 0:35 | "It's a function, sixty times a second. No map, no plan — it reacts to what's just ahead, following rules we wrote." |
 | 3 | Two ways to learn a lap | 3 | 0:35 | "Lucas tried memorizing the track; it ran out of memory and wouldn't transfer. I tuned a reflex, and that's what we kept." |
-| 4 | How the controller drives | 4 | 0:35 | "Read the bend ahead, pick a line, pick a speed, stay out of the wall. It lifts off instead of braking, and it drifts once a lap." |
-| 5 | Two loops: the laptop and the chat | 2 | 0:30 | "The laptop tried 570,000 races. The chats decided what was worth trying: 30 versions, 52 logged decisions." |
-| 6 | Lap time, one chat at a time | 5 | 1:20 | Step the six beats. Each drop has the surprise that caused it: braking killed the engine, the score got gamed, the plateau was the car, ten seconds of driving beat all of it. |
+| 4 | How the controller drives | 4 | 0:35 | "Read the bend ahead, take the widest line through it, pick a speed — and once a lap, drift the way we did by hand." |
+| 5 | Two loops: the laptop and the chat | 2 | 0:30 | "The laptop raced 570,000 times. The chats decided what was worth trying: 30 versions, 52 logged decisions." |
+| 6 | How the lap time came down | 5 | 1:20 | Step the six beats. Each drop has the surprise that caused it: the brake locked the accelerator, the score got gamed, the plateau was the car, ten seconds of driving beat all of it. |
 | 7 | Seed 110, raced three ways | 0 | 0:30 | "Baseline, a human at the keyboard, and what we shipped: laps of 8.20, 7.20, 7.25. Watch the first hairpin." + leaderboard placement |
-| 8 | What we learned — and the open question | 2 | 0:50 | "Early, search bought the seconds; late, only new behaviour did. Which leaves the open question: is Codex a more efficient learner than traditional ML?" |
+| 8 | What we learned — and the open question | 2 | 0:50 | "Tuning got us most of the way; new moves got us the rest. Which leaves the open question: is Codex a more efficient learner than traditional ML?" |
 
 **Total ≈ 5:10.** Slide 6 carries the most weight; if you're running long, stop
 after the plateau beat.
 
 ## Where the final numbers went
 
-The results table slide is no longer in the deck (it's in `extras.html`). Say
-the headline numbers over the race on slide 7 — **7.190 s mean best lap and
-8.160 s first lap across the five grading seeds, every run clean, 100 of 100
-endurance runs survived** — and give the leaderboard placement there. Ask me if
-you'd rather have that line printed on a slide.
+The results table is no longer in the deck (it's in `extras.html`). Say the
+headline numbers over the race on slide 7 — **7.190 s mean best lap and 8.160 s
+first lap across the five grading seeds, every run clean, 100 of 100 endurance
+runs survived** — and give the leaderboard placement there.
 
 ## Jargon, explained in passing
 
 | Slide | Terms |
 | --- | --- |
 | 3 Two ways to learn a lap | seed · cross-entropy search · genetic algorithm |
-| 5 Two loops | generation · elite |
+| 5 Two loops | version · generation · elite · crossover |
 
 Edit one by finding `class="terms"` in `body.html`.
 
@@ -52,7 +51,9 @@ Nine slides are parked in `presentation/parts/extras.html`, kept word for word:
 the results table, the sensor diagram, the seed suites and ranking, CEM versus
 the genetic algorithm, the curvature bug, a glossary, an appendix divider, the
 standalone open-question slide, and the surprises table. They are **not** built.
-To bring one back, move its `<section>` into `body.html` and rebuild.
+Note the glossary there still describes elites as "the only ones allowed to
+breed", which is wrong — see slide 5 below. To bring a slide back, move its
+`<section>` into `body.html` and rebuild.
 
 ## Where to edit
 
@@ -65,24 +66,21 @@ To bring one back, move its `<section>` into `body.html` and rebuild.
 | Title map, controller map, race | `presentation/parts/viz_track.js` |
 | Other drawings | `presentation/parts/viz_misc.js` |
 
-To change when something appears, edit `data-s="n"` on the element and
-`data-steps` on the section.
-
 ---
 
 ## 1 · The 7.19-second lap (`s-title`)
 
 Open on the result. Two cars replay real 30-second runs from seed 110 — grey
 `minimum_viable`, yellow `race_faster` — with live lap times. 28 s is the
-hand-tuned baseline's only lap; 7.19 s is what we shipped, measured on the five
+first controller's only lap; 7.19 s is what we shipped, measured on the five
 grading seeds.
 
 ## 2 · What a controller is (`s-what`) — foundation
 
-A loop: **Sense** → **Decide** → **Act**, 60 times a second. Then: it's a
-function; the car has no map and no plan; ours answers with rules; **we wrote
-the rules, a search found the numbers**; so a lap gets faster only by a
-straighter path or more speed through the corners.
+A loop: **Sense** → **Decide** → **Act**, 60 times a second. It's a function;
+the car has no map and no plan; ours answers with rules (*if the road bends this
+much, aim this far off centre and hold this speed*). So a lap gets faster only
+by a straighter path or more speed through the corners.
 
 ## 3 · Two ways to learn a lap (`s-approaches`) — **approaches**
 
@@ -91,73 +89,98 @@ straighter path or more speed through the corners.
   multi-hour run exhausted memory and crashed the laptop; the result fits one
   track and one starting pose. Abandoned Aug 30.
 - **Zhi · primary — "Tune a reflex"**: the controller from slide 2, with its
-  numbers tuned across many random starts. Works from any start; clean on 14 of
-  14 seeds before tuning; every candidate raced on 28–33 seeds.
+  parameters tuned across many random starts.
 
 *Have Lucas check his column — it comes from the lab notes.*
 
 ## 4 · How the controller drives (`s-controller`)
 
-A real lap on seed 110 coloured by speed. Four plain stages: **read the road**
-(how sharply is it bending 4, 9 and 16 m ahead?) · **choose a line** (swing
-wide, cut the corner, run wide again) · **choose a speed** (about 25 m/s on
-straights, 14 in corners; above that it lifts off rather than brakes) · **stay
-out of the wall** (and once a lap it brakes hard into a corner to rotate — the
-trick copied from a human). 116 numbers set all of it.
+A real lap on seed 110 coloured by speed. Four stages:
+
+1. **Read the road** — how sharply is it bending 4, 9 and 16 m ahead?
+2. **Choose a line** — start a corner on the outside edge, touch the inside
+   edge at its middle, finish on the outside again. The bigger, gentler arc
+   lets the car carry more speed.
+3. **Choose a speed** — aim for 25 m/s on straights and 14 m/s in corners;
+   when it's too fast, let go of the accelerator and coast rather than brake.
+4. **Drift like we did** — by imitating our own recorded laps, once a lap it
+   brakes hard into a corner to swing the car round.
+
+*Stage 4 is imitation in the everyday sense: we watched our recording and coded
+the move by hand, then let the search tune it. No model was trained on the
+recording, so avoid calling it "imitation learning" if asked.*
 
 ## 5 · Two loops: the laptop and the chat (`s-loops`) — **development strategy**
 
-Inner loop: race the candidates, keep the best, breed the next batch — about a
-minute a round, 771 rounds, ≈ 570,000 races, no tokens. Outer loop: question →
-hypothesis → build it → launch a search → promote or reject, across 20
-conversations, 30 versions and 52 logged decisions. Plus who did what.
+**Version** — one search run we set up: which parameters are open to search,
+how wide each one's range is, and how candidates are scored. Everything else
+stays locked at the previous winner, and the search starts from that winner.
+**Generation** — one round inside a version. Every generation in a version
+searches the same parameters; only the values being tried change. Examples:
+v16 searched just the 2 start-speed-cap parameters; v19 re-searched corner
+speed and braking distance with wider ranges; v11 kept v10's 16 parameters and
+only changed the score. (All of this is in slide 5's speaker notes too.)
 
-## 6 · Lap time, one chat at a time (`s-journey`) — **evidence and failures**
+**Inner loop, each round (about a minute):**
 
-The heart of the talk. A step chart from 28.2 s to 7.18 s; bands under the axis
-are the 20 chats (blue Codex, purple Claude Code), brown diamonds are our
-questions, red rings are candidates we rejected. Buttons re-plot the curve
-against agent tokens, calendar time or simulated races. Each beat shows the
-surprise that caused the drop:
+1. Race every candidate in the batch from a few starting points (6 training
+   seeds, later plus the official or grading seeds).
+2. Race the best dozen again from every starting point (28–33) for a reliable
+   score. Nothing is trained here — it's the same candidate, tested more.
+3. Keep that dozen unchanged, and breed the rest of the next batch. Each child
+   gets two parents, each picked as the best of three random batch members.
+   **Crossover**: for every parameter, the child takes a random value between
+   its parents' values (reaching a little beyond either one). **Mutation**:
+   each value has a 1-in-4 chance of a small random nudge.
 
-| Beat | The surprise | Ends at |
+**The first batch** of 64: the previous winner, 15 small random variations of
+it, and 48 completely random settings within the allowed ranges.
+
+**Outer loop:** question → hypothesis → build it → launch a search → promote or
+reject, across 20 conversations, 30 versions and 52 logged decisions.
+
+## 6 · How the lap time came down (`s-journey`) — **evidence and failures**
+
+A single step chart over the dates Aug 28 – Sep 1: blue dots are promoted
+controllers, red rings are rejected candidates, brown diamonds are our
+questions. Each beat shows the surprise that caused the drop:
+
+| Beat | What it says | Ends at |
 | --- | --- | --- |
-| 1 Chats as generations | — | 23.75 s |
-| 2 Search harvests the slack | — | 15.5 s |
-| 3 "Why does it brake?" | Braking switched the engine off until the car nearly stopped | 9.00 s |
-| 4 Widen the limits, fix the score | Our first fast candidate crashed, recovered, sprinted one lap and won on points | 7.78 s |
-| 5 The plateau | Every start returned the identical lap; five versions moved nothing | 7.617 s |
-| 6 Play the game | Ten seconds of driving by hand showed a move the search never tried | 7.183 s |
+| 1 A car that finishes | Our first controller followed the middle of the track: one lap took 28.2 s | 23.75 s |
+| 2 Search harvests the slack | 84 rounds over 14 parameters — target speeds, steering strengths, braking distances; stopped when it stopped improving | 15.5 s |
+| 3 "Why does it brake?" | **Surprise:** tapping the brake put the car into "about to reverse" mode — until it nearly stopped, the accelerator only braked harder. So it coasts instead | 9.00 s |
+| 4 The score got gamed | **Surprise:** the top car hit a wall, limped, then set one fast lap and won on best-lap. Now it must finish three clean laps first; ranges widened where results sat on their edge | 7.78 s |
+| 5 The plateau | **Surprise:** every start gave the identical lap; five versions moved nothing. Got here via a speed cap for the first two seconds, extra speed through the one long bend, and wider ranges | 7.617 s |
+| 6 Play the game | Ten seconds of driving by hand showed the drift; copying the full human sequence was slower | 7.183 s |
 
 ## 7 · Seed 110, raced three ways (`s-race`) — **representative run + results**
 
 Three real runs from the same spawn: grey baseline (one lap, 19.50 s), brown
 human replay (8.55 s, recording ends at 10.4 s), yellow v27 (8.20, 7.20,
-7.25 s), with the throttle traces underneath. Say the grading-seed numbers and
-the leaderboard placement here.
+7.25 s). Say the grading-seed numbers and the leaderboard placement here.
 
 ## 8 · What we learned — and the open question (`s-learned`)
 
-Three bars showing where the 21 seconds came from:
+Three bars showing where the 21 seconds came from (search vs new behaviour),
+then four large bullets:
 
-| Phase | Search | New behaviour |
-| --- | --- | --- |
-| 28.2 → 9.0 s | 12.70 s (66%) | 6.50 s (34%) |
-| 9.0 → 7.9 s | 0.48 s (44%) | 0.62 s (56%) |
-| 7.9 → 7.18 s | 0.12 s (16%) | 0.60 s (84%) |
+- Tuning numbers got us most of the way; the last big gains came from new
+  moves, like coasting and drifting.
+- The search exploits any loophole in its score — it rewarded a car that
+  crashed and then sprinted.
+- When the search stalls, change what the car can do, not how long you search.
+- Our best idea came from driving the car ourselves.
 
-Four large bullets — search bought the early seconds, new behaviour bought the
-last ones; whatever you score is what you get; test on starts you never tuned
-on; our best ideas came from driving the car ourselves. Then the closing line:
-**570,000 races · 504 M tokens · 10.4 s of driving**, under the open question
-in so many words — *is Codex a more efficient learner than traditional ML?*
+Closing line: **570,000 races · 504 M tokens · 10.4 s of driving**, under the
+open question — *is Codex a more efficient learner than traditional ML?*
 
 ---
 
 ## Before you present
 
 - [ ] Decide where to say the leaderboard placement — slide 7 is the natural
-      spot now that the results table is out.
+      spot.
 - [ ] Confirm v27 is the controller you submitted, not v30.
 - [ ] Have Lucas check his column on slide 3 and his role on slide 5.
 - [ ] Split the slides between you; the notes are written so either of you can

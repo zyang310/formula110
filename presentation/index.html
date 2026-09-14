@@ -240,13 +240,12 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
         <ul class="pts up" data-s="2">
           <li>The car has no map and no plan. It cannot think ahead to turn four; it can only answer <em>“what now?”</em> from what it senses this instant.</li>
           <li>Ours answers with rules: <i>if the road bends this much, aim this far off centre and hold this speed.</i></li>
-          <li>Every rule contains numbers. <b>We wrote the rules; a search found the numbers.</b> That split runs through the whole project.</li>
         </ul>
         <p class="small up" data-s="3">So a lap can only get faster two ways: a straighter path through the corners, or more speed carried through them.</p>
       </div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>0:35 · 3 presses · leave by 0:50</b> — “It’s a function, sixty times a second. No map, no plan. Ours follows rules we wrote — and a search found the numbers inside them.”</p><p>Start here if anyone is unsure what we built. The car is not planning a lap; it is reacting, 60 times a second, to a few numbers about the road immediately ahead.</p><p>The last bullet is the thesis of the talk: the structure is ours, the numbers came from search. The learning slide near the end measures which of the two actually bought the seconds.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 3 presses · leave by 0:50</b> — “It’s a function, sixty times a second. No map, no plan — it reacts to what’s just ahead, following rules we wrote.”</p><p>Start here if anyone is unsure what we built. The car is not planning a lap; it is reacting, 60 times a second, to a few numbers about the road immediately ahead.</p></aside>
 </section>
 <section class="slide" id="s-approaches" data-when="08-28 12:00|08-30 23:30" data-steps="3">
   <div class="frame">
@@ -285,14 +284,14 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       </div>
       <div class="stage-list">
         <div class="row up" data-s="1"><span class="k">1</span><div><h3>Read the road</h3><p>How sharply is the road bending 4, 9 and 16 metres ahead?</p></div></div>
-        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Swing wide, cut the corner, run wide again — up to 3 m off the centre line.</p></div></div>
-        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>About 25 m/s on the straights, 14 in the corners. Above that it lifts off rather than brakes.</p></div></div>
-        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Stay out of the wall</h3><p>If a wall gets close it abandons the line and slows. And once a lap it brakes hard into a corner to rotate the car — the trick we copied from a human.</p></div></div>
+        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Start a corner on the outside edge, touch the inside edge at its middle, finish on the outside again. That bigger, gentler arc lets the car carry more speed.</p></div></div>
+        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>Aim for 25 m/s on straights and 14 m/s in corners. When it’s going too fast, it lets go of the accelerator and coasts rather than braking.</p></div></div>
+        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Drift like we did</h3><p>By imitating our own recorded laps, we added a drift: once a lap it brakes hard into a corner to swing the car round.</p></div></div>
         <p class="small up" data-s="4">116 numbers set all of this. Each round of searching tuned 1–20 of them.</p>
       </div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>0:35 · 4 presses · leave by 2:00</b> — “Read the bend ahead, pick a line, pick a speed, stay alive. It coasts instead of braking, and it drifts once per lap.”</p><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 4 presses · leave by 2:00</b> — “Read the bend ahead, take the widest line through it, pick a speed — and once a lap, drift the way we did by hand.”</p><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
 </section>
 <section class="slide" id="s-loops" data-when="all" data-steps="2">
   <div class="frame">
@@ -302,9 +301,9 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       <div class="viz"><svg id="loops-svg" role="img" aria-label="An inner search loop nested inside an outer conversation loop"></svg></div>
       <div class="stack">
         <div class="up" data-s="0"><div class="lab c-blue" style="margin-bottom:.35em">Inner loop · genetic algorithm</div>
-          <p class="small" style="color:var(--ink2)">Sample 16–64 candidates → race each on 6–11 seeds → re-race the elites on 28–33 → cross over, mutate. About a minute per generation, run from Zhi's terminal: <span class="num">771</span> generations, <span class="num">≈ 570,000</span> races, zero tokens.</p></div>
+          <p class="small" style="color:var(--ink2)">Race a batch of candidate settings from a few starting points → race the best dozen again from every starting point → keep that dozen, and breed the rest of the next batch by mixing two good parents and nudging a few values at random. About a minute per round, run from Zhi’s terminal: <span class="num">771</span> rounds, <span class="num">≈ 570,000</span> races, zero tokens.</p></div>
         <div class="up" data-s="1"><div class="lab c-yellow" style="margin-bottom:.35em">Outer loop · a chat with an agent</div>
-          <p class="small" style="color:var(--ink2)">Question → hypothesis → a new behaviour behind a default-off flag, with tests → launch a search → read the checkpoints → promote or reject → one row in the decision log. <span class="num">20</span> conversations, <span class="num">30</span> search versions, <span class="num">52</span> logged decisions. Each chat is a generation of this loop.</p></div>
+          <p class="small" style="color:var(--ink2)">Question → hypothesis → a new behaviour behind a default-off flag, with tests → launch a search → read the checkpoints → promote or reject → one row in the decision log. <span class="num">20</span> conversations, <span class="num">30</span> search versions, <span class="num">52</span> logged decisions. Each chat is one turn of this loop.</p></div>
         <div class="up" data-s="2"><div class="lab" style="margin-bottom:.45em">Who did what</div>
           <ul class="pts small" style="color:var(--ink2)">
             <li><b>Zhi</b> framed the questions, drove the human laps, launched every search and reviewed traces.</li>
@@ -314,28 +313,22 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
           </ul></div>
       </div>
     </div>
-    <p class="terms"><b>Generation</b> — one round of the inner loop: race every candidate, keep the best, breed the next batch.<span class="sep">·</span><b>Elite</b> — the best few in a generation, the only ones allowed to breed.</p>
+    <p class="terms"><b>Version</b> — one search run we set up: which parameters to search, how wide their ranges are, and how to score.<span class="sep">·</span><b>Generation</b> — one round inside a version: the same parameters, new values.<span class="sep">·</span><b>Elite</b> — the best dozen in a round, carried forward unchanged.<span class="sep">·</span><b>Crossover</b> — a child takes each value from between its two parents’ values.</p>
   </div>
-  <aside class="notes"><p class="cue"><b>0:30 · 2 presses · leave by 2:30</b> — “The laptop tried 570,000 races. The chats decided what was worth trying: 30 versions, 52 logged decisions.”</p><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:30 · 2 presses · leave by 2:30</b> — “The laptop tried 570,000 races. The chats decided what was worth trying: 30 versions, 52 logged decisions.”</p><p>If asked what a version is: one search run we set up. It picks which parameters are open to search, how wide each one’s range is, and how candidates are scored; everything else stays locked at the previous winner, and the search starts from that winner. Every generation inside the version searches those same parameters, only trying new values. Examples: v16 searched just the 2 start-speed-cap parameters; v19 re-searched corner speed and braking distance with wider ranges; v11 kept v10’s 16 parameters and only changed the score.</p><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
 </section>
 <section class="slide" id="s-journey" data-when="all" data-steps="5">
   <div class="frame">
-    <header class="sh"><div class="lab">Evidence · and what surprised us</div><h2>Lap time, one chat at a time</h2><span class="when" id="jr-when">Aug 26 – Sep 2</span>
+    <header class="sh"><div class="lab">Evidence · and what surprised us</div><h2>How the lap time came down</h2><span class="when" id="jr-when">Aug 28 – Sep 1</span>
       <p class="sh-lead">Every step down is a controller we promoted — and most of them began with something surprising us.</p></header>
     <div class="grid g-8-4">
-      <div class="chart-col">
-        <div class="btns" role="group" aria-label="Horizontal axis">
-          <span class="small" style="margin-right:.3em">x-axis</span>
-          <button type="button" id="jr-x-tok" aria-pressed="true">Agent tokens</button>
-          <button type="button" id="jr-x-time" aria-pressed="false">Calendar time</button>
-          <button type="button" id="jr-x-trials" aria-pressed="false">Simulated races</button>
-        </div>
-        <div class="viz"><svg id="jr-svg" role="img" aria-label="Best lap time falling from 28.2 to 7.18 seconds, plotted against agent tokens, calendar time or simulated races"></svg></div>
+      <div class="chart-col" style="grid-template-rows:minmax(0,1fr)">
+        <div class="viz"><svg id="jr-svg" role="img" aria-label="Best lap time falling from 28.2 to 7.18 seconds between Aug 28 and Sep 1"></svg></div>
       </div>
       <div id="jr-panel" aria-live="polite"></div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>1:20 · 5 presses · leave by 3:50</b> — Step the six beats; each carries the surprise that caused it. Land on the plateau and the drift. Flip the x-axis if time allows; if you are running long, stop after the plateau beat.</p><p>Step through the beats. Each shaded band on the axis is one conversation with an agent (blue Codex, purple Claude Code). Brown diamonds are moments where one of us asked a question that changed direction.</p><p>Then flip the x-axis: against calendar time the search looks steady; against simulated races the big early drops were cheap and the last 0.4 s came after half a million races; against tokens you can see which conversations paid.</p></aside>
+  <aside class="notes"><p class="cue"><b>1:20 · 5 presses · leave by 3:50</b> — Step the six beats; each carries the surprise that caused it. Land on the plateau and the drift. If you are running long, stop after the plateau beat.</p><p>Step through the beats. Blue dots are controllers we promoted, red rings are candidates we rejected, and brown diamonds mark a question from one of us that changed direction.</p></aside>
 </section>
 <section class="slide" id="s-race" data-when="08-31 12:00|09-01 23:59" data-steps="0">
   <div class="frame">
@@ -343,7 +336,6 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       <p class="sh-lead">Same starting point, same physics, three drivers: our safe baseline, a human at the keyboard, and the controller we shipped.</p></header>
     <div class="stack tight">
       <div class="viz" style="flex:1"><svg id="race-svg" role="img" aria-label="Three cars replaying seed 110: baseline, human replay, and the final controller"></svg><div id="race-read" class="readouts"></div></div>
-      <div class="viz" style="height:calc(8.2*var(--u))"><svg id="race-strip" role="img" aria-label="Throttle traces for the final controller and the human driver"></svg></div>
       <div class="btns">
         <button type="button" id="race-play" aria-pressed="false">Pause</button>
         <button type="button" id="race-restart">Restart</button>
@@ -356,7 +348,7 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       </div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>0:30 · no presses · leave by 4:20</b> — “Baseline, a human at the keyboard, and v27. Watch the first hairpin.”</p><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27's drift pulse is five ticks long. The throttle strip shows it — v27 dips below zero for a blink, the human holds the brake.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:30 · no presses · leave by 4:20</b> — “Baseline, a human at the keyboard, and v27. Watch the first hairpin.”</p><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27’s drift is a far shorter tap.</p></aside>
 </section>
 <section class="slide" id="s-learned" data-when="all" data-steps="2">
   <div class="frame">
@@ -368,10 +360,10 @@ table.t{border-collapse:collapse;width:100%;font-size:var(--t-small)}
       </div>
       <div class="stack">
         <ul class="pts big up" data-s="1" style="color:var(--ink2)">
-          <li>Search bought the early seconds; new behaviour bought the last ones.</li>
-          <li>Whatever you score is what you get.</li>
-          <li>Test on starts you never tuned on.</li>
-          <li>Our best ideas came from driving the car ourselves.</li>
+          <li>Tuning numbers got us most of the way; the last big gains came from new moves, like coasting and drifting.</li>
+          <li>The search exploits any loophole in its score — it rewarded a car that crashed and then sprinted.</li>
+          <li>When the search stalls, change what the car can do, not how long you search.</li>
+          <li>Our best idea came from driving the car ourselves.</li>
         </ul>
       </div>
     </div>
@@ -709,6 +701,18 @@ HOOKS['s-controller'] = {
 
     // 1 · lookahead at the tightest corner: car 14 m before max turning angle
     const n = TRK.n, P = TRK.P;
+    // keep the lookahead illustration away from the corner where the drift happens
+    let driftI = -1;
+    {
+      const thr0 = p.meta.thr, f0 = Math.round(c[0] * 60), f1 = Math.round(c[1] * 60);
+      for (let t = f0; t <= f1 && driftI < 0; t++) {
+        if (thr0[t] >= 0) continue;
+        const q = posAt(p, t / 60);
+        let bd0 = 1e18;
+        P.forEach((pp, j) => { const d = Math.hypot(pp[0] - q[0], pp[1] - q[1]); if (d < bd0) { bd0 = d; driftI = j; } });
+      }
+    }
+    const nearDrift = i => driftI >= 0 && Math.min(Math.abs(i - driftI), n - Math.abs(i - driftI)) < 30;
     let best = 0, bi = 0;
     for (let i = 0; i < n; i++) {
       let a = 0;
@@ -718,7 +722,7 @@ HOOKS['s-controller'] = {
         let d = h2 - h1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
         a += Math.abs(d);
       }
-      if (a > best) { best = a; bi = i; }
+      if (a > best && !nearDrift(i)) { best = a; bi = i; }
     }
     const walk = (i, dist) => { // walk along centre line by dist units (signed)
       let j = i, acc = 0; const dir = dist >= 0 ? 1 : -1;
@@ -759,7 +763,7 @@ HOOKS['s-controller'] = {
     clusters.forEach(([a, b]) => {
       const q = posAt(p, (a + b) / 120);
       S('circle', { cx: q[0], cy: q[1], r: 34, fill: 'none', stroke: COL.ink, 'stroke-width': 1.6, 'stroke-dasharray': '4 4' }, g4);
-      S('text', { x: q[0] + 42, y: q[1] + 6, 'font-size': 18, class: 'tx-ink', text: `drift pulse · ${((b - a + 1) / 60).toFixed(2)} s` }, g4);
+      S('text', { x: q[0], y: q[1] + 60, 'font-size': 18, 'text-anchor': 'middle', class: 'tx-ink', text: 'drift' }, g4);
     });
     const lg = sl.querySelector('#ctrl-legend');
     lg.innerHTML = `<span><span class="sw" style="background:${COL.base}"></span>baseline, <code>minimum_viable</code></span>` +
@@ -780,26 +784,6 @@ HOOKS['s-race'] = {
       readRow(box, COL.brown, 'Human (Zhi), replayed'),
       readRow(box, COL.yellow, 'race_faster · v27'),
     ];
-    // throttle strip
-    const st = sl.querySelector('#race-strip');
-    const W = 1000, Hh = 92, X0 = 70, X1 = 930;
-    st.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
-    const xt = t => X0 + (t / 30) * (X1 - X0), yv = v => 38 - v * 28;
-    this.xt = xt;
-    S('line', { x1: X0, x2: X1, y1: yv(0), y2: yv(0), class: 'ax' }, st);
-    [1, -1].forEach(v => S('line', { x1: X0, x2: X1, y1: yv(v), y2: yv(v), class: 'gr' }, st));
-    [['+1', 1], ['0', 0], ['−1', -1]].forEach(([l, v]) => S('text', { x: X0 - 10, y: yv(v) + 5, 'font-size': 14, 'text-anchor': 'end', text: l }, st));
-    S('text', { x: 4, y: 20, 'font-size': 14, class: 'tx-ink', text: 'throttle' }, st);
-    for (let s = 0; s <= 30; s += 5) S('text', { x: xt(s), y: Hh - 2, 'font-size': 13, 'text-anchor': 'middle', text: s + ' s' }, st);
-    const line = (arr, col) => {
-      const pts = arr.map((v, i) => [xt(i / 60), yv(v / 100)]);
-      S('path', { d: openD(pts), fill: 'none', stroke: col, 'stroke-width': 1.6, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' }, st);
-    };
-    line(DATA.paths.human.thr, COL.brown);
-    line(DATA.paths.v27.thr, COL.yellow);
-    S('text', { x: X1 + 8, y: yv(0.95) + 5, 'font-size': 13, text: 'v27', fill: COL.ink2 }, st);
-    S('text', { x: xt(10.5) + 6, y: yv(-0.8), 'font-size': 13, text: 'human ends', fill: COL.ink2 }, st);
-    this.head = S('line', { y1: 4, y2: 74, stroke: COL.ink, 'stroke-width': 1.2 }, st);
 
     this.t = 0; this.rate = 1; this.playing = true; this.hold = 0;
     const $ = id => sl.querySelector('#' + id);
@@ -825,8 +809,6 @@ HOOKS['s-race'] = {
       if (n) s += ' · lap ' + laps.slice(0, n).map(x => x.toFixed(2) + ' s').join(', ');
       this.rows[i].textContent = s;
     });
-    const x = this.xt(t).toFixed(1);
-    this.head.setAttribute('x1', x); this.head.setAttribute('x2', x);
     this.scrub.value = t.toFixed(2);
     this.lbl.textContent = t.toFixed(1) + ' s';
   },
@@ -862,46 +844,37 @@ const T0 = edtEpoch(8, 26, 12, 0), T1 = edtEpoch(9, 2, 14, 0);
 const DAYS = []; for (let d = 27; d <= 33; d++) DAYS.push(d <= 31 ? edtEpoch(8, d, 0, 0) : edtEpoch(9, d - 31, 0, 0));
 const MODES = {
   tok: { f: fTok, d: [0, 510], ticks: [0, 100, 200, 300, 400, 500], fmt: v => (v ? v + ' M' : '0'), title: 'agent tokens processed (millions) — 97% are cached re-reads of the conversation' },
-  time: { f: t => t, d: [T0, T1], ticks: DAYS, fmt: fmtDay, title: 'calendar time (EDT)' },
+  time: { f: t => t, d: [edtEpoch(8, 28, 6, 0), edtEpoch(9, 2, 4, 0)], ticks: [28, 29, 30, 31, 32].map(d => (d <= 31 ? edtEpoch(8, d, 12, 0) : edtEpoch(9, d - 31, 12, 0))), fmt: fmtDay, title: 'date (EDT)' },
   trials: { f: fTrial, d: [0, 580000], ticks: [0, 1e5, 2e5, 3e5, 4e5, 5e5], fmt: v => (v ? v / 1000 + 'k' : '0'), title: 'simulated 30-second races — ≈ 198 days of driving in total' },
 };
 const PTS = J.points.slice().sort((a, b) => a.t - b.t);
 const REJ = [{ t: edtEpoch(8, 28, 20, 18), lap: 9.65, v: 'v2 CEM gate', label: 'CEM gate' }].concat(J.rejected);
+REJ.forEach(r => { r.below = /crash|launch/.test(r.label); }); // the curve runs just above these two
 const QUOTE = i => J.prompts[i].text;
 const BEATS = [
-  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 26 – 28', title: 'Chats as generations', text: 'Each band under the axis is one conversation with an agent — Codex in blue, Claude Code in purple. Forty-five million tokens went by before the car turned a wheel; then a hand-tuned controller ran one 28.2 s lap, and twenty rounds of search made it 23.75 s.', stat: '28.2 → 23.75 s' },
-  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'Eighty-four rounds of search over the same fourteen numbers. We stopped when it stopped improving.', stat: '15.5 s' },
-  { T: edtEpoch(8, 28, 23, 32), key: 'v2', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', surprise: 'Braking switched the engine off until the car had nearly stopped — a fifty-to-one loss we never suspected.', text: 'Coasting instead of braking, plus a proper racing line: 24% more distance and a second lap.', stat: '9.57 → 9.00 s' },
-  { T: edtEpoch(8, 29, 23, 20), key: 'v9', z: 0, date: 'Aug 29', title: 'Widen the limits, fix the score', surprise: 'Our first genuinely fast candidate (red) crashed, recovered, then sprinted one good lap — and won on points. So we scored three laps instead of one and demanded a clean run before rewarding speed.', text: 'We also widened limits the winners kept bumping into.', stat: '7.78 s' },
-  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', surprise: 'Every starting point came back with exactly the same lap, and five versions in a row improved nothing at all. The limit was the car itself, not the search.', text: 'A launch limit, a boost through the long sweeper and wider limits had taken it to 7.617 s — and there it stopped.', stat: '7.617 s' },
-  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 3, z: 1, date: 'Aug 31 – Sep 1', title: 'Play the game', text: 'Ten seconds of one of us driving by hand showed a move the search had never been allowed to try: a boost down the corridor, then a hard brake into the corner to rotate the car. Clean from all 33 starts. Copying the whole human sequence (red), though, came out slower.', stat: '7.183 s' },
+  { T: edtEpoch(8, 28, 13, 13), key: 'minimum CEM', z: 0, date: 'Aug 28', title: 'A car that finishes', text: 'Our first controller simply followed the middle of the track: one lap took 28.2 seconds. Twenty rounds of search on its settings brought that down to 23.75 s.', stat: '28.2 → 23.75 s' },
+  { T: edtEpoch(8, 28, 14, 22), key: 'CEM · faster', z: 0, date: 'Aug 28 · afternoon', title: 'Search harvests the slack', text: 'Eighty-four rounds of search over fourteen parameters — target speeds, steering strengths, braking distances. We stopped when it stopped improving.', stat: '15.5 s' },
+  { T: edtEpoch(8, 28, 23, 32), key: 'v2', prompt: 0, z: 0, date: 'Aug 28 · evening', title: '“Why does it brake?”', surprise: 'Tapping the brake put the car into ‘about to reverse’ mode: until it had nearly stopped, pressing the accelerator only braked harder.', text: 'So the car now lets go of the accelerator and coasts instead, and takes a proper racing line: 24% more distance and a second lap. A first search method was rejected (red); a genetic algorithm took it to 9.0 s.', stat: '9.57 → 9.00 s' },
+  { T: edtEpoch(8, 29, 23, 20), key: 'v9', z: 0, date: 'Aug 29', title: 'The score got gamed', surprise: 'The top-scoring car (red) hit a wall, limped along, then set one fast lap. Once a car survived, our score ranked it by its single best lap — so it won.', text: 'We changed the score so a car must finish three laps without damage before its speed is compared. And where the best results kept landing on the edge of a parameter’s allowed range, we widened the range.', stat: '7.78 s' },
+  { T: edtEpoch(8, 31, 11, 48), key: 'v19', z: 1, date: 'Aug 30 – 31', title: 'The plateau', surprise: 'Every starting point came back with exactly the same lap, and five versions in a row improved nothing. The limit was the car’s rules, not the search.', text: 'Three changes got it here: capping speed for the first two seconds so it didn’t overshoot the first corner, adding speed through the track’s one long, steady bend, and widening the search ranges again.', stat: '7.617 s' },
+  { T: edtEpoch(9, 2, 13, 30), key: 'v27', prompt: 3, z: 1, date: 'Aug 31 – Sep 1', title: 'Play the game', text: 'Ten seconds of one of us driving by hand showed a move the search had never been allowed to try: full speed down the long straight, then brake hard into the corner to swing the car round. Clean from all 33 starts. Copying the whole human sequence (red), though, came out slower.', stat: '7.183 s' },
 ];
 
 HOOKS['s-journey'] = {
   init(sl) {
     const svg = this.svg = sl.querySelector('#jr-svg');
-    const W = 1000, Hh = 660; this.L = 66; this.R = 985; this.T = 16; this.B = 524;
+    const W = 1000, Hh = 585; this.L = 66; this.R = 985; this.T = 16; this.B = 524;
     svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
     const defs = S('defs', {}, svg);
     const cp = S('clipPath', { id: 'jr-clip' }, defs);
-    S('rect', { x: this.L, y: this.T - 8, width: this.R - this.L + 8, height: this.B - this.T + 8 }, cp);
+    S('rect', { x: this.L, y: this.T - 8, width: this.R - this.L, height: this.B - this.T + 8 }, cp);
     this.gY = S('g', {}, svg);
     this.gX = S('g', {}, svg);
     S('line', { x1: this.L, x2: this.R, y1: this.B, y2: this.B, class: 'ax' }, svg);
-    S('text', { x: this.L - 10, y: this.B + 38, 'font-size': 13, 'text-anchor': 'end', text: 'Codex' }, svg);
-    S('text', { x: this.L - 10, y: this.B + 56, 'font-size': 13, 'text-anchor': 'end', text: 'Claude Code' }, svg);
-    this.xTitle = S('text', { x: (this.L + this.R) / 2, y: this.B + 110, 'font-size': 14, 'text-anchor': 'middle', class: 'tx-mute' }, svg);
+    this.xTitle = S('text', { x: (this.L + this.R) / 2, y: this.B + 54, 'font-size': 14, 'text-anchor': 'middle', class: 'tx-mute' }, svg);
     S('text', { x: 4, y: this.T + 4, 'font-size': 13, class: 'tx-mute', text: 'best lap' }, svg);
-    // chat bands
-    this.chats = J.chats.map((c, i) => {
-      const y = c.agent === 'codex' ? this.B + 27 : this.B + 45;
-      const g = S('g', {}, svg);
-      const r = S('rect', { y, height: 13, rx: 2, fill: c.agent === 'codex' ? COL.blue : COL.purple, 'fill-opacity': 0.55, stroke: COL.bg, 'stroke-width': 1 }, g);
-      S('title', { text: `Chat ${i + 1} · ${c.name} · ${fmtDay(c.t0)} ${fmtHM(c.t0)} · ${c.total.toFixed(1)} M tokens` }, r);
-      const tx = S('text', { y: y - 3, 'font-size': 11, 'text-anchor': 'middle', class: 'tx-mute', text: String(i + 1) }, g);
-      return { c, r, tx };
-    });
+    this.chats = [];
     const plot = S('g', { 'clip-path': 'url(#jr-clip)' }, svg);
     this.plateau = S('g', {}, plot);
     this.plLine = S('line', { stroke: COL.mute, 'stroke-dasharray': '5 5', 'stroke-width': 1.2 }, this.plateau);
@@ -933,8 +906,7 @@ HOOKS['s-journey'] = {
     S('path', { d: 'M212 -6 L217 0 L212 6 L207 0 Z', fill: COL.brown }, lg); S('text', { x: 223, y: 4.5, 'font-size': 13, text: 'our question' }, lg);
 
     this.panel = sl.querySelector('#jr-panel');
-    this.st = { mode: 'tok', from: 'tok', mk: 1, z: 0, rev: BEATS[0].T, beat: 0 };
-    ['tok', 'time', 'trials'].forEach(m => sl.querySelector('#jr-x-' + m).addEventListener('click', () => this.setMode(m)));
+    this.st = { mode: 'time', from: 'time', mk: 1, z: 0, rev: BEATS[0].T, beat: 0 };
     this.render();
     this.fillPanel(0);
   },
@@ -960,7 +932,7 @@ HOOKS['s-journey'] = {
       M.ticks.forEach(v => {
         const x = L + (v - M.d[0]) / (M.d[1] - M.d[0]) * (R - L);
         S('line', { x1: x, x2: x, y1: this.B, y2: this.B + 5, class: 'ax', opacity: op }, this.gX);
-        S('text', { x, y: this.B + 86, 'font-size': 13, 'text-anchor': 'middle', opacity: op, text: M.fmt(v) }, this.gX);
+        S('text', { x, y: this.B + 26, 'font-size': 13, 'text-anchor': 'middle', opacity: op, text: M.fmt(v) }, this.gX);
       });
     });
     this.xTitle.textContent = MODES[s.mode].title;
@@ -996,7 +968,8 @@ HOOKS['s-journey'] = {
       t.setAttribute('x', flip ? -10 : 10);
       t.setAttribute('text-anchor', flip ? 'end' : 'start');
       const crowded = placed.some(p => Math.abs(p[0] - x) < 160 && Math.abs(p[1] - y) < 26);
-      t.setAttribute('y', crowded ? 20 : -8);
+      const base = r.below ? 22 : -8;
+      t.setAttribute('y', crowded ? base + 18 : base);
       placed.push([x, y]);
     });
     const pb = BEATS[s.beat].prompt;
@@ -1016,7 +989,7 @@ HOOKS['s-journey'] = {
     const b = BEATS[k], p = b.prompt != null ? J.prompts[b.prompt] : null;
     this.panel.innerHTML =
       `<div class="jr-date">${b.date} · beat ${k + 1} of ${BEATS.length}</div><h3>${b.title}</h3>` +
-      (p ? `<blockquote class="q">${p.text}<cite>— Zhi, to Codex · ${fmtDay(p.t)}, ${fmtHM(p.t)}</cite></blockquote>` : '') +
+      (p ? `<blockquote class="q">${p.text}<cite>— Zhi · ${fmtDay(p.t)}, ${fmtHM(p.t)}</cite></blockquote>` : '') +
       (b.surprise ? `<div class="surprise"><span class="lab">The surprise</span><p>${b.surprise}</p></div>` : '') +
       `<p>${b.text}</p><div class="spacer"></div><div class="jr-stat">${b.stat}</div>`;
   },

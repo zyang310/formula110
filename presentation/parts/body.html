@@ -28,13 +28,12 @@
         <ul class="pts up" data-s="2">
           <li>The car has no map and no plan. It cannot think ahead to turn four; it can only answer <em>“what now?”</em> from what it senses this instant.</li>
           <li>Ours answers with rules: <i>if the road bends this much, aim this far off centre and hold this speed.</i></li>
-          <li>Every rule contains numbers. <b>We wrote the rules; a search found the numbers.</b> That split runs through the whole project.</li>
         </ul>
         <p class="small up" data-s="3">So a lap can only get faster two ways: a straighter path through the corners, or more speed carried through them.</p>
       </div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>0:35 · 3 presses · leave by 0:50</b> — “It’s a function, sixty times a second. No map, no plan. Ours follows rules we wrote — and a search found the numbers inside them.”</p><p>Start here if anyone is unsure what we built. The car is not planning a lap; it is reacting, 60 times a second, to a few numbers about the road immediately ahead.</p><p>The last bullet is the thesis of the talk: the structure is ours, the numbers came from search. The learning slide near the end measures which of the two actually bought the seconds.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 3 presses · leave by 0:50</b> — “It’s a function, sixty times a second. No map, no plan — it reacts to what’s just ahead, following rules we wrote.”</p><p>Start here if anyone is unsure what we built. The car is not planning a lap; it is reacting, 60 times a second, to a few numbers about the road immediately ahead.</p></aside>
 </section>
 <section class="slide" id="s-approaches" data-when="08-28 12:00|08-30 23:30" data-steps="3">
   <div class="frame">
@@ -73,14 +72,14 @@
       </div>
       <div class="stage-list">
         <div class="row up" data-s="1"><span class="k">1</span><div><h3>Read the road</h3><p>How sharply is the road bending 4, 9 and 16 metres ahead?</p></div></div>
-        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Swing wide, cut the corner, run wide again — up to 3 m off the centre line.</p></div></div>
-        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>About 25 m/s on the straights, 14 in the corners. Above that it lifts off rather than brakes.</p></div></div>
-        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Stay out of the wall</h3><p>If a wall gets close it abandons the line and slows. And once a lap it brakes hard into a corner to rotate the car — the trick we copied from a human.</p></div></div>
+        <div class="row up" data-s="2"><span class="k">2</span><div><h3>Choose a line</h3><p>Start a corner on the outside edge, touch the inside edge at its middle, finish on the outside again. That bigger, gentler arc lets the car carry more speed.</p></div></div>
+        <div class="row up" data-s="3"><span class="k">3</span><div><h3>Choose a speed</h3><p>Aim for 25 m/s on straights and 14 m/s in corners. When it’s going too fast, it lets go of the accelerator and coasts rather than braking.</p></div></div>
+        <div class="row up" data-s="4"><span class="k">4</span><div><h3>Drift like we did</h3><p>By imitating our own recorded laps, we added a drift: once a lap it brakes hard into a corner to swing the car round.</p></div></div>
         <p class="small up" data-s="4">116 numbers set all of this. Each round of searching tuned 1–20 of them.</p>
       </div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>0:35 · 4 presses · leave by 2:00</b> — “Read the bend ahead, pick a line, pick a speed, stay alive. It coasts instead of braking, and it drifts once per lap.”</p><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:35 · 4 presses · leave by 2:00</b> — “Read the bend ahead, take the widest line through it, pick a speed — and once a lap, drift the way we did by hand.”</p><p>Walk the four stages in order — this is exactly what runs every tick. Point at the map: the dashed line is the centre line; the coloured line is our car, blue where slow, yellow where fast. The grey line is the baseline hugging the centre.</p><p>If asked "is this machine learning?": the structure is hand-designed; the numbers inside it were found by search against a score. That split — structure vs parameters — is the theme of our learning slide.</p></aside>
 </section>
 <section class="slide" id="s-loops" data-when="all" data-steps="2">
   <div class="frame">
@@ -90,9 +89,9 @@
       <div class="viz"><svg id="loops-svg" role="img" aria-label="An inner search loop nested inside an outer conversation loop"></svg></div>
       <div class="stack">
         <div class="up" data-s="0"><div class="lab c-blue" style="margin-bottom:.35em">Inner loop · genetic algorithm</div>
-          <p class="small" style="color:var(--ink2)">Sample 16–64 candidates → race each on 6–11 seeds → re-race the elites on 28–33 → cross over, mutate. About a minute per generation, run from Zhi's terminal: <span class="num">771</span> generations, <span class="num">≈ 570,000</span> races, zero tokens.</p></div>
+          <p class="small" style="color:var(--ink2)">Race a batch of candidate settings from a few starting points → race the best dozen again from every starting point → keep that dozen, and breed the rest of the next batch by mixing two good parents and nudging a few values at random. About a minute per round, run from Zhi’s terminal: <span class="num">771</span> rounds, <span class="num">≈ 570,000</span> races, zero tokens.</p></div>
         <div class="up" data-s="1"><div class="lab c-yellow" style="margin-bottom:.35em">Outer loop · a chat with an agent</div>
-          <p class="small" style="color:var(--ink2)">Question → hypothesis → a new behaviour behind a default-off flag, with tests → launch a search → read the checkpoints → promote or reject → one row in the decision log. <span class="num">20</span> conversations, <span class="num">30</span> search versions, <span class="num">52</span> logged decisions. Each chat is a generation of this loop.</p></div>
+          <p class="small" style="color:var(--ink2)">Question → hypothesis → a new behaviour behind a default-off flag, with tests → launch a search → read the checkpoints → promote or reject → one row in the decision log. <span class="num">20</span> conversations, <span class="num">30</span> search versions, <span class="num">52</span> logged decisions. Each chat is one turn of this loop.</p></div>
         <div class="up" data-s="2"><div class="lab" style="margin-bottom:.45em">Who did what</div>
           <ul class="pts small" style="color:var(--ink2)">
             <li><b>Zhi</b> framed the questions, drove the human laps, launched every search and reviewed traces.</li>
@@ -102,28 +101,22 @@
           </ul></div>
       </div>
     </div>
-    <p class="terms"><b>Generation</b> — one round of the inner loop: race every candidate, keep the best, breed the next batch.<span class="sep">·</span><b>Elite</b> — the best few in a generation, the only ones allowed to breed.</p>
+    <p class="terms"><b>Version</b> — one search run we set up: which parameters to search, how wide their ranges are, and how to score.<span class="sep">·</span><b>Generation</b> — one round inside a version: the same parameters, new values.<span class="sep">·</span><b>Elite</b> — the best dozen in a round, carried forward unchanged.<span class="sep">·</span><b>Crossover</b> — a child takes each value from between its two parents’ values.</p>
   </div>
-  <aside class="notes"><p class="cue"><b>0:30 · 2 presses · leave by 2:30</b> — “The laptop tried 570,000 races. The chats decided what was worth trying: 30 versions, 52 logged decisions.”</p><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:30 · 2 presses · leave by 2:30</b> — “The laptop tried 570,000 races. The chats decided what was worth trying: 30 versions, 52 logged decisions.”</p><p>If asked what a version is: one search run we set up. It picks which parameters are open to search, how wide each one’s range is, and how candidates are scored; everything else stays locked at the previous winner, and the search starts from that winner. Every generation inside the version searches those same parameters, only trying new values. Examples: v16 searched just the 2 start-speed-cap parameters; v19 re-searched corner speed and braking distance with wider ranges; v11 kept v10’s 16 parameters and only changed the score.</p><p>The key working agreement (decision log, Aug 28): the agent builds and verifies the tooling; we own the long-running commands. That kept tokens for thinking, not for babysitting a search.</p><p>Rules we adopted along the way: never rank on official seeds; stop a version after ten flat generations; reopen a bound the elites are pinned against before inventing a new lever; every new behaviour ships default-off so the incumbent stays bit-reproducible; never delete a losing branch.</p></aside>
 </section>
 <section class="slide" id="s-journey" data-when="all" data-steps="5">
   <div class="frame">
-    <header class="sh"><div class="lab">Evidence · and what surprised us</div><h2>Lap time, one chat at a time</h2><span class="when" id="jr-when">Aug 26 – Sep 2</span>
+    <header class="sh"><div class="lab">Evidence · and what surprised us</div><h2>How the lap time came down</h2><span class="when" id="jr-when">Aug 28 – Sep 1</span>
       <p class="sh-lead">Every step down is a controller we promoted — and most of them began with something surprising us.</p></header>
     <div class="grid g-8-4">
-      <div class="chart-col">
-        <div class="btns" role="group" aria-label="Horizontal axis">
-          <span class="small" style="margin-right:.3em">x-axis</span>
-          <button type="button" id="jr-x-tok" aria-pressed="true">Agent tokens</button>
-          <button type="button" id="jr-x-time" aria-pressed="false">Calendar time</button>
-          <button type="button" id="jr-x-trials" aria-pressed="false">Simulated races</button>
-        </div>
-        <div class="viz"><svg id="jr-svg" role="img" aria-label="Best lap time falling from 28.2 to 7.18 seconds, plotted against agent tokens, calendar time or simulated races"></svg></div>
+      <div class="chart-col" style="grid-template-rows:minmax(0,1fr)">
+        <div class="viz"><svg id="jr-svg" role="img" aria-label="Best lap time falling from 28.2 to 7.18 seconds between Aug 28 and Sep 1"></svg></div>
       </div>
       <div id="jr-panel" aria-live="polite"></div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>1:20 · 5 presses · leave by 3:50</b> — Step the six beats; each carries the surprise that caused it. Land on the plateau and the drift. Flip the x-axis if time allows; if you are running long, stop after the plateau beat.</p><p>Step through the beats. Each shaded band on the axis is one conversation with an agent (blue Codex, purple Claude Code). Brown diamonds are moments where one of us asked a question that changed direction.</p><p>Then flip the x-axis: against calendar time the search looks steady; against simulated races the big early drops were cheap and the last 0.4 s came after half a million races; against tokens you can see which conversations paid.</p></aside>
+  <aside class="notes"><p class="cue"><b>1:20 · 5 presses · leave by 3:50</b> — Step the six beats; each carries the surprise that caused it. Land on the plateau and the drift. If you are running long, stop after the plateau beat.</p><p>Step through the beats. Blue dots are controllers we promoted, red rings are candidates we rejected, and brown diamonds mark a question from one of us that changed direction.</p></aside>
 </section>
 <section class="slide" id="s-race" data-when="08-31 12:00|09-01 23:59" data-steps="0">
   <div class="frame">
@@ -131,7 +124,6 @@
       <p class="sh-lead">Same starting point, same physics, three drivers: our safe baseline, a human at the keyboard, and the controller we shipped.</p></header>
     <div class="stack tight">
       <div class="viz" style="flex:1"><svg id="race-svg" role="img" aria-label="Three cars replaying seed 110: baseline, human replay, and the final controller"></svg><div id="race-read" class="readouts"></div></div>
-      <div class="viz" style="height:calc(8.2*var(--u))"><svg id="race-strip" role="img" aria-label="Throttle traces for the final controller and the human driver"></svg></div>
       <div class="btns">
         <button type="button" id="race-play" aria-pressed="false">Pause</button>
         <button type="button" id="race-restart">Restart</button>
@@ -144,7 +136,7 @@
       </div>
     </div>
   </div>
-  <aside class="notes"><p class="cue"><b>0:30 · no presses · leave by 4:20</b> — “Baseline, a human at the keyboard, and v27. Watch the first hairpin.”</p><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27's drift pulse is five ticks long. The throttle strip shows it — v27 dips below zero for a blink, the human holds the brake.</p></aside>
+  <aside class="notes"><p class="cue"><b>0:30 · no presses · leave by 4:20</b> — “Baseline, a human at the keyboard, and v27. Watch the first hairpin.”</p><p>All three start from the same seed-110 spawn. The human run is Zhi's recorded keyboard input replayed through the simulator — it reproduces the recorded sensors exactly.</p><p>Watch the first hairpin: the human brakes hard to rotate and loses more speed; v27’s drift is a far shorter tap.</p></aside>
 </section>
 <section class="slide" id="s-learned" data-when="all" data-steps="2">
   <div class="frame">
@@ -156,10 +148,10 @@
       </div>
       <div class="stack">
         <ul class="pts big up" data-s="1" style="color:var(--ink2)">
-          <li>Search bought the early seconds; new behaviour bought the last ones.</li>
-          <li>Whatever you score is what you get.</li>
-          <li>Test on starts you never tuned on.</li>
-          <li>Our best ideas came from driving the car ourselves.</li>
+          <li>Tuning numbers got us most of the way; the last big gains came from new moves, like coasting and drifting.</li>
+          <li>The search exploits any loophole in its score — it rewarded a car that crashed and then sprinted.</li>
+          <li>When the search stalls, change what the car can do, not how long you search.</li>
+          <li>Our best idea came from driving the car ourselves.</li>
         </ul>
       </div>
     </div>
